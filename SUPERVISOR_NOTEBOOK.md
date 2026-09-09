@@ -627,3 +627,59 @@ fourth copy-repair: **every Claude seat now authenticates with
   `git commit -F -` with a quoted heredoc, never `-m` inside double quotes.**
 - Pattern status: **closed.** Reopen only if a seat authenticates with something
   other than the token, or if the token is revoked before its one-year term.
+
+## Measuring across an event the agent cannot cause (2026-09-09)
+
+- Supervisor briefed a probe to "test whether the volume identifier survives **reboot**." Flawed
+  instruction: **a seat cannot reboot the machine** — it would kill itself mid-run — so the honest
+  outcome would have been `NOT TESTED`, permanently, and the gap would have been recorded rather
+  than closed.
+- Lead's fix, worth reusing: split the probe into **`--record` / `--verify`**. `--record` writes
+  the current identifiers (and, opportunistically, a set of freshly allocated inode numbers) to a
+  durable file now; `--verify` re-reads and compares after any later boot. The probe reports
+  `NOT TESTED (pending reboot)` **with the exact verify command**, and the reading completes for
+  free at the machine's next ordinary restart.
+- It closed **two** stated gaps at once — the volume identifier across reboot, and an
+  inode-reuse-across-reboot reading an earlier probe had explicitly left open. Neither required
+  anyone to force a reboot.
+- Generalisation: when a measurement depends on an event outside the agent's authority — reboot,
+  a deploy, a certificate arriving, a user action — **do not accept `NOT TESTED`; leave a durable
+  record and a one-command verifier.** The gap converts from permanent to pending.
+- Supervisor lesson: I wrote an instruction a seat could not physically satisfy, and the Lead did
+  not simply comply-and-fail or push back with the objection alone — it returned the objection
+  **with the redesign attached**. That is the response worth reinforcing, and it only happens if
+  the brief invites correction rather than demanding compliance.
+
+## Verifying a sealed council seal without reading the seats
+
+- Observation: on `pptx2html-llm` round 1 all three lanes shared one checkout, so Lane
+  A's report sat on disk (23:29) before Lanes C (23:35) and B (23:37) submitted. The
+  seal was behavioural — `protocol/council.md` defines `sealed` that way — so it was
+  breakable with one `cat` and nothing would have recorded it.
+- Cause evidence: `docs/council/lane-a-source-and-inheritance.md` mtime precedes both
+  other lanes' commits (`1c3b349`, `3e0b8e1`).
+- **Method that settled it cheaply, and the distinction that makes it work**: grep the
+  later reports for references to the earlier lane, then classify each hit. A brief
+  that asks each lane to *state its requirements on the other axes* guarantees
+  cross-lane mentions, so hit count alone proves nothing — the discriminator is
+  **direction**. Requirements and open questions ("Lane A to confirm", "requirement
+  A1", "wrong provenance from Lane A" as a listed failure mode) are the brief being
+  obeyed. Citing another lane's *conclusion* as settled would be the breach. On this
+  round all 21 hits across B and C were the former, and B labelled the very claims it
+  routed to A as `OPINION` — the opposite of having peeked.
+- Impact if skipped: a broken seal turns three independent evidence streams into one
+  correlated one, and convergence then reads as confirmation when it is contagion.
+  Nothing else in the topology would surface it.
+- Anti-pattern avoided: I nearly reported "terminal sentinel absent" off a guessed
+  grep pattern that returned 0. That is the same shape as the truncation failures
+  logged above — a negative from an unvalidated method. Checked the actual file tails
+  instead; the reports carry the SEAT REPORT fields, and report shape is the Lead's
+  acceptance call, not mine.
+- Pattern status: first occurrence of the check; the seal-on-shared-checkout structure
+  will recur in every council that is not given separate worktrees.
+- Protocol candidate: `protocol/council.md` could name this as the seal audit — one
+  grep, classify by direction — so a Lead or Supervisor is not left choosing between
+  trusting the seal and reading the seats. Worktree isolation makes the seal
+  structural instead, at the cost of setup; worth stating the trade rather than
+  leaving it implicit.
+- Human decision needed: none.
