@@ -1,1 +1,0 @@
-../memory/SUPERVISOR_NOTEBOOK.md

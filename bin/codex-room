@@ -10,7 +10,7 @@ esac
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$script_dir/codex-room-sync" "$role"
-export CODEX_HOME="${HOME}/.codex-runtime/${role}"
+export CODEX_HOME="${HOME}/.paseo/codex-runtime/${role}"
 
 # Codex reaches models through the local CLIProxyAPI custom provider. The key
 # is read from the proxy config rather than copied here, so rotating it there

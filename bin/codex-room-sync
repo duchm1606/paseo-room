@@ -2,10 +2,10 @@
 """Materialize an isolated CODEX_HOME for one room role.
 
 Reads the operator's ~/.codex/config.toml as the base, applies the role
-overlay from <repo>/runtime/overlays/<role>.config.toml, and writes
-~/.codex-runtime/<role>/config.toml plus a patched model catalog. Shared
-operator resources (auth, AGENTS.md, skills, plugins, ...) are symlinked
-into the role runtime.
+overlay from ~/.paseo/orchestration/overlays/<role>.config.toml, and writes
+~/.paseo/codex-runtime/<role>/config.toml plus a patched model catalog.
+Shared operator resources (auth, AGENTS.md, skills, plugins, ...) are
+symlinked into the role runtime.
 
 Overlay format: top-level scalars before the first TOML table are role
 overrides; a developer_instructions triple-quoted block is the role prompt.
@@ -23,8 +23,8 @@ import subprocess
 import sys
 import tempfile
 
-RUNTIME_DIR = pathlib.Path(__file__).resolve().parent.parent
-OVERLAY_DIR = RUNTIME_DIR / "overlays"
+ROOM_DIR = pathlib.Path(__file__).resolve().parent.parent
+OVERLAY_DIR = ROOM_DIR / "overlays"
 ROLES = ("supervisor", "lead", "peer", "peer-zen", "review")
 
 # Keys stripped from the base config head so the overlay value (or this
@@ -117,7 +117,7 @@ def main() -> None:
     role = sys.argv[1]
     home = pathlib.Path.home()
     codex_home = home / ".codex"
-    runtime = home / ".codex-runtime" / role
+    runtime = home / ".paseo" / "codex-runtime" / role
     runtime.mkdir(parents=True, exist_ok=True)
     runtime.chmod(0o700)
 
