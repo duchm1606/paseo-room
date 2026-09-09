@@ -58,6 +58,23 @@ for role in lead peer supervisor; do
   [ -L "$p/skills" ] || die "claude-$role: skills symlink missing"
 done
 
+# 6. Seat credential preflight. No model call — this only checks that the
+#    launcher can RESOLVE a token, which is the exact failure that used to
+#    surface as a dead seat minutes after a Lead was briefed.
+tok="${CLAUDE_CODE_OAUTH_TOKEN:-}"
+if [ -z "$tok" ] && [ -r "$HOME/.zshrc" ]; then
+  l="$(grep -E '^[[:space:]]*export[[:space:]]+CLAUDE_CODE_OAUTH_TOKEN=' "$HOME/.zshrc" | tail -1)"
+  tok="${l#*=}"; tok="${tok%\"}"; tok="${tok#\"}"; tok="${tok%\'}"; tok="${tok#\'}"
+fi
+case "$tok" in
+  sk-ant-oat*) ;;
+  "") die "no CLAUDE_CODE_OAUTH_TOKEN resolvable from the environment or ~/.zshrc; every claude seat will refuse to start" ;;
+  *)  die "CLAUDE_CODE_OAUTH_TOKEN does not look like a setup-token (expected sk-ant-oat...)" ;;
+esac
+for v in ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY; do
+  [ -z "${!v:-}" ] || die "$v is set and outranks CLAUDE_CODE_OAUTH_TOKEN; seats would authenticate with it instead"
+done
+
 if [ "$fail" -eq 0 ]; then
   echo SMOKE_OK
 fi

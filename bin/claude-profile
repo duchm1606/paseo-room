@@ -4,7 +4,9 @@
 # Each role runs in an isolated Claude Code profile home under
 # ~/.claude/profiles/claude-<role> (via CLAUDE_CONFIG_DIR), so seat state —
 # sessions, projects, caches — never mixes with the operator's ~/.claude.
-# OAuth credentials come from the shared macOS Keychain entry.
+# Authentication is CLAUDE_CODE_OAUTH_TOKEN, a one-year subscription token
+# from `claude setup-token` (owner directive 2026-09-09). See the resolution
+# block below for why, and for what it costs.
 #
 # Auto-memory is disabled for seats: durable findings belong in the handback
 # or repo docs, not in a per-seat memory store nobody reviews.
@@ -48,15 +50,47 @@ if [ ! -e "$PROFILE_DIR/.claude.json" ]; then
     || printf '{"hasCompletedOnboarding": true}\n' > "$PROFILE_DIR/.claude.json"
 fi
 
-# Isolated profiles do not see the operator's Keychain-scoped login; seed a
-# file credential once from the shared Keychain entry. If a seat ever reports
-# "Not logged in", delete the profile's .credentials.json and relaunch to
-# re-seed (or run /login in that profile).
-if [ ! -e "$PROFILE_DIR/.credentials.json" ]; then
-  if cred="$(security find-generic-password -s 'Claude Code-credentials' -a "$USER" -w 2>/dev/null)"; then
-    (umask 177; printf '%s\n' "$cred" > "$PROFILE_DIR/.credentials.json")
-  fi
+# Seat authentication: one long-lived subscription token for every role.
+#
+# What this replaces, and why. Each profile used to be seeded with a COPY of the
+# operator's Keychain credential. The provider rotates refresh tokens on use, so
+# the first seat to refresh invalidated every other copy, which then persisted
+# blank — seats went hard-down roughly every 8 hours, twice on 2026-09-09, once
+# killing a build kickoff. `CLAUDE_CODE_OAUTH_TOKEN` is a static bearer token:
+# nothing refreshes, so there is no lineage left to invalidate. The failure mode
+# is removed by construction rather than made less likely.
+#
+# The cost, so nobody rediscovers it as a bug: a token from `claude setup-token`
+# "can only make model requests" — seats CANNOT establish Remote Control sessions
+# or fetch claude.ai connectors (Notion, Gmail, Drive, Calendar, Excalidraw).
+# Locally configured MCP servers still work. Owner accepted this for all roles.
+#
+# Precedence: the variable sits below ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY /
+# apiKeyHelper and above a /login credential. None of the three higher sources is
+# set in this room; if one ever is, it silently wins and this token is ignored.
+#
+# The daemon does not inherit the operator's interactive shell, so an already-set
+# value wins and ~/.zshrc is the fallback source — the owner keeps managing the
+# token in one place. Same shape as codex-room reading its key from the proxy
+# config instead of holding a second copy.
+if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -r "$HOME/.zshrc" ]; then
+  line="$(grep -E '^[[:space:]]*export[[:space:]]+CLAUDE_CODE_OAUTH_TOKEN=' \
+    "$HOME/.zshrc" | tail -1)"
+  token="${line#*=}"
+  token="${token%\"}"; token="${token#\"}"
+  token="${token%\'}"; token="${token#\'}"
+  CLAUDE_CODE_OAUTH_TOKEN="$token"
 fi
+
+# Fail closed and loudly. Falling back to a /login credential here would work
+# today and silently re-arm the rotation race, which is the whole defect.
+case "${CLAUDE_CODE_OAUTH_TOKEN:-}" in
+  sk-ant-oat*) ;;
+  "") printf 'claude-profile: no CLAUDE_CODE_OAUTH_TOKEN in the environment or ~/.zshrc; refusing to start %s. Mint one with `claude setup-token` and export it from ~/.zshrc.\n' "$ROLE" >&2
+      exit 3 ;;
+  *)  printf 'claude-profile: CLAUDE_CODE_OAUTH_TOKEN does not look like a setup-token (expected sk-ant-oat...); refusing to start %s rather than authenticate with a mangled value.\n' "$ROLE" >&2
+      exit 3 ;;
+esac
 
 # Trust the launch directory: seats are only spawned into owner-created
 # workspaces, and an untrusted dir silently drops project allow rules.
@@ -73,4 +107,5 @@ fi
 export CLAUDE_CONFIG_DIR="$PROFILE_DIR"
 export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
 export ROOM_ROLE="$ROLE"
+export CLAUDE_CODE_OAUTH_TOKEN
 exec claude --append-system-prompt "$(cat "$PROMPT_FILE")" "$@"
