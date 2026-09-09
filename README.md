@@ -7,8 +7,8 @@ There are no symlink indirections and no installer — the checkout itself
 is the live surface.
 
 ```text
-~/.paseo/                       Paseo daemon home — delete it and the room
-│                               (minus ~/.claude/profiles, see below) is gone
+~/.paseo/                       Paseo daemon home — delete it and the whole
+│                               room is gone with it
 ├── config.json                 daemon-owned wiring table: agents.providers
 │                               command -> orchestration/bin/<launcher>
 ├── orchestration/              THIS git checkout (master)
