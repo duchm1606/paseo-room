@@ -572,3 +572,58 @@ peer        accessFP=fa51379bb7 refreshFP=487b0591d9 expiresAt=2026-09-10T06:48:
 - Human decision needed: yes, and it is getting more expensive to defer — do the
   per-profile `/login` for `claude-lead` and `claude-peer` so each seat owns an
   independent OAuth session.
+
+### RESOLVED — OAuth lineage race closed by construction, not repaired again (2026-09-09 23:37 +07)
+
+Third occurrence was never reached. The owner directed the durable fix instead of a
+fourth copy-repair: **every Claude seat now authenticates with
+`CLAUDE_CODE_OAUTH_TOKEN`**, a one-year subscription token from
+`claude setup-token`. Merged to `master` as `69f02dc`.
+
+- **Why this ends the pattern rather than delaying it.** The defect was never
+  "credentials expire"; it was **N copies of one refresh-token lineage rotating
+  against each other**. A setup-token is a static bearer credential — nothing
+  refreshes, so there is no lineage left to invalidate. The failure mode is
+  removed, not made less likely. Every previous intervention in this notebook was
+  a copy-repair with a predicted re-arm time; this is the first that has no
+  re-arm.
+- **The Keychain seeding block in `bin/claude-profile` is gone.** By tonight it was
+  not merely dead but harmful: it seeded new profiles from the shared entry, and
+  that entry is blank, so any new role profile would have been born dead — and the
+  failure would have looked like a Paseo defect. Its recovery comment was stale in
+  the same direction. Both flagged earlier today and now removed rather than
+  re-flagged.
+- **Fails closed on purpose.** If no token resolves, the launcher exits 3 instead of
+  falling back to a `/login` credential. That fallback would work today and
+  silently re-arm the race, which is exactly the class of bug this room keeps
+  paying for.
+- **The preflight finally exists.** `tests/smoke.sh` now resolves the token, checks
+  its shape, and verifies no higher-precedence source (`ANTHROPIC_AUTH_TOKEN`,
+  `ANTHROPIC_API_KEY`) is set. Proposed twice in this notebook after seats died
+  mid-assignment; both new branches were verified to FAIL when they should, so it
+  is not a check that always passes.
+- **Method that actually settled it — a negative control on the credential itself.**
+  Running the launcher with a well-formed but bogus token returned `401 OAuth
+  access token is invalid`. Without that control, a successful probe would have
+  proven nothing: the Keychain login was still present and would have served the
+  request either way. A green auth probe with a working fallback in place is not
+  evidence. This is the same positive/negative-control discipline that caught the
+  four truncation errors, applied to auth.
+- **Accepted cost, owner-directed for all roles**: a setup-token "can only make
+  model requests", so seats lose Remote Control and claude.ai connectors — Notion,
+  Gmail, Drive, Calendar, Excalidraw. Notion is in active use. Recommendation on
+  record was to keep Supervisor on `/login` to preserve it; the owner chose all
+  roles, twice. Local MCP servers are unaffected.
+- **Residual, not covered by the fix**: seats already running at merge time keep the
+  old Keychain credential, which still expires 2026-09-10 06:48:09 +07. The fix
+  applies at launch. A replacement seat spawned after a death gets the token, so
+  recovery is now clean even if the old race fires once more.
+- **Operator error worth recording, mine.** The first attempt to commit this used
+  `git commit -m "…"` with backticks in the message; bash ran the substitution and
+  launched a real `claude setup-token` process that sat waiting on browser
+  approval. No side effect — a setup-token saves nothing until approved, and the
+  `.zshrc` token fingerprint was unchanged — but it is a live-credential command
+  fired by a quoting mistake. **Commit messages containing backticks go through
+  `git commit -F -` with a quoted heredoc, never `-m` inside double quotes.**
+- Pattern status: **closed.** Reopen only if a seat authenticates with something
+  other than the token, or if the token is revoked before its one-year term.
