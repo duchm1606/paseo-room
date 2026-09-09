@@ -2,7 +2,7 @@
 # Shared launcher: claude-profile <role> [claude args...]
 #
 # Each role runs in an isolated Claude Code profile home under
-# ~/.paseo/claude-profiles/claude-<role> (via CLAUDE_CONFIG_DIR), so seat state —
+# ~/.claude/profiles/claude-<role> (via CLAUDE_CONFIG_DIR), so seat state —
 # sessions, projects, caches — never mixes with the operator's ~/.claude.
 # OAuth credentials come from the shared macOS Keychain entry.
 #
@@ -10,7 +10,7 @@
 # or repo docs, not in a per-seat memory store nobody reviews.
 #
 # First launch seeds the profile:
-#   settings.json -> profiles/settings.json (this repo)  (hooks, plugin kill-switch)
+#   settings.json -> ~/.claude/profiles/settings.json (hooks, plugin kill-switch)
 #   skills        -> ~/.claude/skills                (user skill surface; the
 #                                                     role-gate allow-lists
 #                                                     assume this exact set)
@@ -24,7 +24,7 @@ ROOM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROMPT_FILE="$ROOM/roles/$ROLE.md"
 [ -f "$PROMPT_FILE" ] || { echo "unknown role: $ROLE" >&2; exit 1; }
 
-PROFILE_DIR="$HOME/.paseo/claude-profiles/claude-$ROLE"
+PROFILE_DIR="$HOME/.claude/profiles/claude-$ROLE"
 mkdir -p "$PROFILE_DIR"
 
 link() { # link <name> <target>: seed a symlink, never clobber a real file
@@ -39,7 +39,7 @@ link() { # link <name> <target>: seed a symlink, never clobber a real file
   ln -s "$target" "$path"
 }
 
-link settings.json "$ROOM/profiles/settings.json"
+link settings.json "$HOME/.claude/profiles/settings.json"
 link skills "$HOME/.claude/skills"
 
 if [ ! -e "$PROFILE_DIR/.claude.json" ]; then
