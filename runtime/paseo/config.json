@@ -86,7 +86,7 @@
       "lead": {
         "extends": "claude",
         "label": "Lead-of-record",
-        "description": "Router and binding arbiter \u2014 planning, coordination, acceptance",
+        "description": "Router and binding arbiter — planning, coordination, acceptance",
         "command": [
           "/Users/duchoang/.paseo/orchestration/bin/claude-lead"
         ],
@@ -153,7 +153,7 @@
         "label": "Codex Peer",
         "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools",
         "command": [
-          "/Users/duchoang/.local/bin/codex-room",
+          "/Users/duchoang/.paseo/orchestration/bin/codex-room",
           "peer"
         ],
         "models": [
@@ -185,15 +185,15 @@
       "codex-peer-zen": {
         "extends": "codex",
         "label": "Codex Peer (Zen direct)",
-        "description": "Peer seat routed straight to OpenCode Zen, bypassing CLIProxyAPI. Carries gpt-5.6-luna only: it is the one model CLIProxyAPI breaks (dropped SSE terminator events) and also the only one Zen serves with a stream Codex can parse. Every other Zen model is worse on this path \u2014 measured 2026-08-08. Remove once CLIProxyAPI is fixed. Owner rule: Luna peers always run with max thinking; the room config now defaults this seat to max reasoning effort.",
+        "description": "Peer seat routed straight to OpenCode Zen, bypassing CLIProxyAPI. Carries gpt-5.6-luna only: it is the one model CLIProxyAPI breaks (dropped SSE terminator events) and also the only one Zen serves with a stream Codex can parse. Every other Zen model is worse on this path — measured 2026-08-08. Remove once CLIProxyAPI is fixed. Owner rule: Luna peers always run with max thinking; the room config now defaults this seat to max reasoning effort.",
         "command": [
-          "/Users/duchoang/.local/bin/codex-room",
+          "/Users/duchoang/.paseo/orchestration/bin/codex-room",
           "peer-zen"
         ],
         "models": [
           {
             "id": "gpt-5.6-luna",
-            "label": "GPT-5.6 Luna \u2014 bounded scout/impl (Zen direct)",
+            "label": "GPT-5.6 Luna — bounded scout/impl (Zen direct)",
             "isDefault": true
           }
         ],
@@ -209,13 +209,13 @@
         "label": "Codex Review (OCR lane)",
         "description": "Dedicated review seat: one Luna Max seat operates Alibaba open-code-review in delegation mode (ocr delegate preview/rule only), inspects the frozen candidate itself, and returns evidence-shaped findings to Lead. Third review lane beside dual review; behaviorally read-only; findings are evidence, Lead retains acceptance. Zen direct because CLIProxyAPI breaks gpt-5.6-luna.",
         "command": [
-          "/Users/duchoang/.local/bin/codex-room",
+          "/Users/duchoang/.paseo/orchestration/bin/codex-room",
           "review"
         ],
         "models": [
           {
             "id": "gpt-5.6-luna",
-            "label": "GPT-5.6 Luna \u2014 max-effort OCR review (Zen direct)",
+            "label": "GPT-5.6 Luna — max-effort OCR review (Zen direct)",
             "isDefault": true
           }
         ],
@@ -231,7 +231,7 @@
         "label": "Codex Supervisor (watcher)",
         "description": "Cheap watcher seat on an off-catalog model. Unlike every other codex-* provider this one is listed in daemon.mcp.injectIntoProviders, because a watcher that cannot wake the supervisor-of-record is useless. Carries deepseek-v4-flash (DeepInfra via CLIProxyAPI). Off-catalog: Codex reports a context window that is not its own, so keep it on bounded read-and-report work and never trust its context budgeting.",
         "command": [
-          "/Users/duchoang/.local/bin/codex-room",
+          "/Users/duchoang/.paseo/orchestration/bin/codex-room",
           "supervisor"
         ],
         "models": [

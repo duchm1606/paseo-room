@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+"""Materialize an isolated CODEX_HOME for one room role.
+
+Reads the operator's ~/.codex/config.toml as the base, applies the role
+overlay from <repo>/runtime/overlays/<role>.config.toml, and writes
+~/.codex-runtime/<role>/config.toml plus a patched model catalog. Shared
+operator resources (auth, AGENTS.md, skills, plugins, ...) are symlinked
+into the role runtime.
+
+Overlay format: top-level scalars before the first TOML table are role
+overrides; a developer_instructions triple-quoted block is the role prompt.
+Room directives (consumed here, never written to the merged config):
+  room_link_default_skills = false   -> do not link ~/.codex skills/plugins
+  room_instructions_from = "<role>"  -> inherit that overlay's instructions
+"""
+
 import json
 import os
 import pathlib
@@ -8,152 +23,12 @@ import subprocess
 import sys
 import tempfile
 
-ROLES = {
-    "supervisor": {
-        # Watcher seat: an off-catalog cheap model. DeepSeek is absent from the
-        # Codex catalog, so the "raise sub-high defaults" patch below never
-        # touches it. Note: model_reasoning_effort and model_reasoning_summary
-        # were measured here on 2026-09-01 and are DECOYS — Paseo overrides both
-        # at spawn, and turn_context reported summary="auto" regardless. Set
-        # effort on the Paseo side (--thinking), not here.
-        "model": "deepseek-v4-flash",
-        "sandbox_mode": "read-only",
-        "approval_policy": "never",
-        "instructions": """Room role: Supervisor. You are the portfolio governance partner for the Human owner.
+RUNTIME_DIR = pathlib.Path(__file__).resolve().parent.parent
+OVERLAY_DIR = RUNTIME_DIR / "overlays"
+ROLES = ("supervisor", "lead", "peer", "peer-zen", "review")
 
-Own portfolio routing, workflow health, evidence reconciliation, owner-decision relay, and bounded Lead lifecycle operations explicitly authorized by the Human. Do not implement project code or take technical acceptance from Lead. Treat suspected failures as hypotheses: record observation, evidence, counterevidence, causal mechanism, impact, and an open question. Never score Lead or Peer by agreement.
-
-Use Paseo as the only agent control plane. Never bypass a project Lead to command a Peer. After two correction rounds in one finding family, stop symptom patches and test for a shared missing mechanism. Escalate product goals, portfolio priority, material cost, external effects, and owner-only risk trade-offs to Human.""",
-    },
-    "lead": {
-        "model": "gpt-5.6-sol",
-        "sandbox_mode": "workspace-write",
-        "approval_policy": "on-request",
-        "instructions": """Room role: Lead. You are the binding technical authority for one assigned project.
-
-Own framing, decomposition, Peer routing, ownership, dependencies, architecture, integration, verification, and technical acceptance. Use Paseo as the only agent control plane and inspect provider, model, workspace, and agent identifiers instead of guessing. One writer owns one moving scope; concurrent writers require isolated worktrees; review only an exact commit or deterministic snapshot.
-
-Give neutral outcome briefs, not predetermined implementations. Peer may return REOPEN_REQUEST when evidence invalidates a premise, DEPENDENCY_REQUEST for an unowned prerequisite, or BLOCKED when no safe progress remains. Confirm Peer start once, then use Paseo events. Do not poll unchanged status. FINISH, IDLE, ERROR, and permission events are attention signals, never acceptance evidence.
-
-For a finding, ask an evidence-backed open question and reconcile CONFIRM, PARTIAL, CHALLENGE, or BLOCK before correction. After two rounds in one finding family, inspect the shared mechanism. Decide ACCEPT, REVISE, or WAIT only after inspecting the exact candidate and proportionate verification. Escalate product scope, portfolio conflict, cost, external action, and owner-only trade-offs.""",
-    },
-    "peer": {
-        "model": "gpt-5.6-terra",
-        # Owner rule 2026-08-10: peer seats never run below high. The config
-        # default is high so a spawn that omits a thinking option lands on
-        # high instead of the catalog default (Sol's is low).
-        "model_reasoning_effort": "high",
-        # Owner directive 2026-08-10: suppress the reasoning narration Codex
-        # renders as "thinking". Measured cost before this: ~21.7k of 30.8k
-        # output tokens in one DeepSeek session were agent_reasoning text.
-        "model_reasoning_summary": "none",
-        "sandbox_mode": "workspace-write",
-        "approval_policy": "on-request",
-        "instructions": """Room role: Peer. You are a persistent engineering collaborator responsible for judgment inside the scope assigned by Lead.
-
-Treat the brief as an outcome and ownership boundary, not a prescribed conclusion. Investigate enough to form an independent technical position, reject a false premise, and reopen a material architecture constraint when evidence endangers the outcome. Make ordinary local decisions yourself; report cross-scope decisions, changed contracts, consequential disagreement, dependencies, and blockers to Lead.
-
-Independent judgment is not performative dissent. Do not manufacture objections, speculative blockers, or approval requests. Agreement is valid when evidence supports it. Stay within the single-owner boundary, preserve unrelated work, verify your changes, identify the exact candidate, and report evidence and unresolved risk honestly. You have no orchestration authority.""",
-    },
-}
-
-# Dedicated OCR review seat ("codex-review" in Paseo). One Luna seat operates
-# Alibaba open-code-review in delegation mode and returns findings to Lead;
-# no other profile knows about OCR and Lead never runs `ocr` itself (its raw
-# output is too noisy for the coordination seat). This is the third review
-# lane next to the two dual-review lanes — it does not replace the macro
-# (architectural/lifecycle) review. It rides the same Zen-direct transport as
-# peer-zen because it is gpt-5.6-luna (see the CLIProxyAPI note below).
-# The seat gets no default skills: the OCR instructions below are its entire
-# specialization.
-ROLES["review"] = {
-    "model": "gpt-5.6-luna",
-    "model_reasoning_effort": "max",
-    "sandbox_mode": "danger-full-access",
-    "approval_policy": "never",
-    "link_default_skills": False,
-    "instructions": """Room role: Review.
-
-You are Codex Review, a specialized read-only review execution profile under
-Lead authority. This is a disposition inside the existing Lead -> Peer model,
-not a new authority tier. Review only the exact stable candidate and contract
-identified by Lead.
-
-Behavioral read-only means no project-artifact or remote-state writes. Do not
-edit or fix project files; commit, push, merge, or post; send messages to remote
-systems; or perform any other project or remote-state write. Do not issue ACCEPT
-or REVISE. Lead alone owns technical verdicts and correction routing. Do not
-spawn, manage, delegate to, or coordinate agents.
-
-Establish the candidate identity before inspection, then verify it again before
-handoff. If the candidate changes, stop immediately and report STALE_CANDIDATE
-with the old and observed identities; do not combine evidence across snapshots.
-
-Account for 100% of candidate files. Build an exact file manifest from the
-candidate identity and assign every entry exactly one disposition:
-
-- reviewed: substantively inspected in repository context;
-- excluded-with-reason: outside the review contract, with a concrete reason;
-- metadata-only: accounted through identity/type/change metadata without
-  substantive content inspection; deleted and non-text files may use this.
-
-Only files listed by OCR as `reviewable_files` require substantive inspection.
-Report manifest total plus reviewed, excluded-with-reason, and metadata-only
-totals; they must sum exactly to the manifest total. Do not silently omit
-generated, vendored, binary, renamed, deleted, or test files. If complete
-disposition accounting is impossible, stop and report the concrete gap to Lead.
-
-Treat every finding as a hypothesis, not a verdict. Each finding must include:
-
-- evidence: exact location and reproducible observation;
-- consequence: the concrete behavior or risk if the hypothesis is true;
-- disproof: the smallest check that could falsify it;
-- smallest correction: the narrowest likely correction, without implementing it.
-
-Try to falsify findings and report clean evidence honestly; do not invent a
-finding quota. Passing tests and lifecycle status are evidence, not acceptance.
-
-Open Code Review is optional delegation only. First run `command -v ocr`. If it
-is absent and the assigned review requires OCR, return `DEPENDENCY_REQUEST` to
-Lead naming the missing `ocr` executable and stop that delegated path. If it is
-present, the only allowed OCR commands are `ocr delegate preview` followed by
-`ocr delegate rule`. Never run `ocr review` or any OCR mode that edits, fixes,
-posts, or delegates coordination authority. Independently verify OCR output
-against the stable candidate before reporting it.
-
-The runtime uses `danger-full-access` only because OCR preview persists local
-operational session JSONL. The sole behavioral read-only write exception is OCR
-operational session metadata under `~/.opencodereview/sessions`. Preview may
-leave an incomplete session there. Do not treat that session or its metadata as
-review evidence, and do not delete, truncate, or otherwise clean it
-destructively.
-
-The Luna Max choice follows a contextual Demonthorn recommendation for bounded
-OCR review. It is not an independent benchmark or a general model ranking.
-
-If findings repeat across correction rounds, or several findings indicate one
-state, lifecycle, ownership, contract, or foundation flaw, stop the local
-review/fix loop and return `REOPEN_REQUEST` with the shared mechanism evidence
-and the decision Lead must revisit. Do not prescribe a compatibility layer,
-fallback, wrapper, or series of symptom patches to keep the loop moving.
-
-Return a concise handoff containing candidate identity; contract reviewed;
-file-accounting total; commands and checks run; findings in the required shape;
-stale/dependency/reopen signals; and residual uncertainty. Lead decides what to
-accept, revise, or route.""",
-}
-
-# Same seat as "peer", reached over a different transport. CLIProxyAPI 7.2.120
-# drops the SSE terminator events for gpt-5.6-luna, so Codex never finalises an
-# item and the seat announces a tool call it never runs; codex-room sends this
-# role straight to OpenCode Zen instead. The role exists only to carry that one
-# model — everything else stays on CLIProxyAPI. Remove this entry along with the
-# rest of the bypass once CLIProxyAPI is fixed.
-# Luna peers always run max thinking (owner rule, 2026-08-10): the config
-# default is max so the seat is correct even when the spawner forgets to set
-# a thinking option.
-ROLES["peer-zen"] = {**ROLES["peer"], "model": "gpt-5.6-luna", "model_reasoning_effort": "max"}
-
+# Keys stripped from the base config head so the overlay value (or this
+# script's computed value) is the only definition in the merged config.
 OVERRIDE_KEYS = {
     "model", "model_catalog_json", "model_reasoning_effort",
     "model_reasoning_summary",
@@ -165,6 +40,7 @@ OVERRIDE_KEYS = {
 # provider via CLIPROXY_API_KEY, so no OpenAI login file needs to exist.
 OPTIONAL_LINKS = {"auth.json"}
 
+
 def atomic_write(path: pathlib.Path, content: str) -> None:
     fd, temporary = tempfile.mkstemp(prefix=f"{path.name}.", dir=path.parent)
     try:
@@ -174,6 +50,36 @@ def atomic_write(path: pathlib.Path, content: str) -> None:
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def top_level_table_offset(text: str) -> int:
+    match = re.search(r"(?m)^\[", text)
+    return match.start() if match else len(text)
+
+
+def overlay_scalars(text: str) -> dict[str, str]:
+    """Raw `key = value` pairs before the first table, comments excluded."""
+    values: dict[str, str] = {}
+    for line in text[:top_level_table_offset(text)].splitlines():
+        match = re.match(r"^([A-Za-z0-9_]+)\s*=\s*(.+)$", line)
+        if match:
+            values[match.group(1)] = match.group(2).strip()
+    return values
+
+
+def unquote(raw: str) -> str:
+    match = re.match(r'^"(.*)"$', raw)
+    if not match:
+        raise SystemExit(f"expected a quoted TOML string, got: {raw}")
+    return match.group(1)
+
+
+def overlay_instructions(text: str, source: pathlib.Path) -> str:
+    match = re.search(r'(?ms)^developer_instructions\s*=\s*"""\n(.*?)\n"""\s*$', text)
+    if not match:
+        raise SystemExit(f"no developer_instructions block in {source}")
+    return match.group(1)
+
 
 def set_table_flag(text: str, table: str, key: str) -> str:
     header = rf"(?m)^\[{re.escape(table)}\]\s*$"
@@ -189,6 +95,7 @@ def set_table_flag(text: str, table: str, key: str) -> str:
                else section.rstrip() + f"\n{key} = false\n\n")
     return text[:match.end()] + section + text[end:]
 
+
 def safe_link(runtime: pathlib.Path, name: str, source: pathlib.Path) -> None:
     if not source.exists():
         if name in OPTIONAL_LINKS:
@@ -203,15 +110,27 @@ def safe_link(runtime: pathlib.Path, name: str, source: pathlib.Path) -> None:
         target.unlink()
     target.symlink_to(source)
 
+
 def main() -> None:
     if len(sys.argv) != 2 or sys.argv[1] not in ROLES:
-        raise SystemExit("usage: codex-room-sync <supervisor|lead|peer|peer-zen|review>")
+        raise SystemExit(f"usage: codex-room-sync <{'|'.join(ROLES)}>")
     role = sys.argv[1]
     home = pathlib.Path.home()
     codex_home = home / ".codex"
     runtime = home / ".codex-runtime" / role
     runtime.mkdir(parents=True, exist_ok=True)
     runtime.chmod(0o700)
+
+    overlay_path = OVERLAY_DIR / f"{role}.config.toml"
+    overlay = overlay_path.read_text()
+    scalars = overlay_scalars(overlay)
+    instructions_role = scalars.pop("room_instructions_from", None)
+    link_default_skills = scalars.pop("room_link_default_skills", "true") != "false"
+    if instructions_role is not None:
+        source = OVERLAY_DIR / f"{unquote(instructions_role)}.config.toml"
+        instructions = overlay_instructions(source.read_text(), source)
+    else:
+        instructions = overlay_instructions(overlay, overlay_path)
 
     codex = shutil.which("codex")
     if not codex:
@@ -222,6 +141,8 @@ def main() -> None:
     if not isinstance(catalog.get("models"), list) or not catalog["models"]:
         raise SystemExit("active Codex model catalog is empty")
     for model in catalog["models"]:
+        # A non-null multi_agent_version makes raw `codex exec` hang under
+        # Paseo; the room never uses Codex-native agents.
         model["multi_agent_version"] = None
         # Owner rule 2026-08-10: thinking floor is high. When a turn selects
         # a model without an explicit effort (paseo omits it unless a
@@ -239,32 +160,30 @@ def main() -> None:
     catalog_path = runtime / "model-catalog.no-native-agents.json"
     atomic_write(catalog_path, json.dumps(catalog, separators=(",", ":")) + "\n")
 
-    base_path = codex_home / "config.toml"
-    base = base_path.read_text()
+    base = codex_home.joinpath("config.toml").read_text()
     base = re.sub(
         r'(?ms)^developer_instructions\s*=\s*""".*?^"""\s*$',
         "",
         base,
         count=1,
     )
-    first_table = re.search(r"(?m)^\[", base)
-    offset = first_table.start() if first_table else len(base)
+    offset = top_level_table_offset(base)
     head, tail = base[:offset], base[offset:]
     kept = []
     for line in head.splitlines():
         match = re.match(r"^([A-Za-z0-9_]+)\s*=", line)
         if not match or match.group(1) not in OVERRIDE_KEYS:
             kept.append(line)
-    role_config = ROLES[role]
     head = "\n".join(kept).rstrip() + "\n"
-    head += f'model = "{role_config["model"]}"\n'
-    head += f'model_reasoning_effort = "{role_config.get("model_reasoning_effort", "medium")}"\n'
-    if role_config.get("model_reasoning_summary"):
-        head += f'model_reasoning_summary = "{role_config["model_reasoning_summary"]}"\n'
-    head += f'sandbox_mode = "{role_config["sandbox_mode"]}"\n'
-    head += f'approval_policy = "{role_config["approval_policy"]}"\n'
+    head += f'model = {scalars["model"]}\n'
+    effort = scalars.get("model_reasoning_effort", '"medium"')
+    head += f'model_reasoning_effort = {effort}\n'
+    if "model_reasoning_summary" in scalars:
+        head += f'model_reasoning_summary = {scalars["model_reasoning_summary"]}\n'
+    head += f'sandbox_mode = {scalars["sandbox_mode"]}\n'
+    head += f'approval_policy = {scalars["approval_policy"]}\n'
     head += f'model_catalog_json = {json.dumps(str(catalog_path))}\n'
-    head += 'developer_instructions = """\n' + role_config["instructions"] + '\n"""\n\n'
+    head += 'developer_instructions = """\n' + instructions + '\n"""\n\n'
     merged = head + tail.lstrip()
     merged = set_table_flag(merged, "agents", "enabled")
     merged = set_table_flag(merged, "features", "multi_agent")
@@ -272,7 +191,7 @@ def main() -> None:
     atomic_write(runtime / "config.toml", merged)
 
     links = ["auth.json", "AGENTS.md", "hooks.json", "skills", "plugins", "model-instructions.md"]
-    if not role_config.get("link_default_skills", True):
+    if not link_default_skills:
         # The OCR review seat carries no default skills; its developer
         # instructions are the whole specialization.
         for name in ("skills", "plugins"):
@@ -287,7 +206,10 @@ def main() -> None:
         notebook = runtime / "SUPERVISOR_NOTEBOOK.md"
         if not notebook.exists():
             atomic_write(notebook, "# Supervisor Notebook\n\nRecord only durable causal evidence.\n")
+    # Codex app-server reserves stdout for its JSONL protocol; diagnostics
+    # stay on stderr.
     print(runtime, file=sys.stderr)
+
 
 if __name__ == "__main__":
     main()

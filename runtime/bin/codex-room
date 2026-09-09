@@ -8,22 +8,32 @@ case "$role" in
   *) printf 'invalid Codex Room role: %s\n' "$role" >&2; exit 2 ;;
 esac
 
-"${HOME}/.local/bin/codex-room-sync" "$role"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$script_dir/codex-room-sync" "$role"
 export CODEX_HOME="${HOME}/.codex-runtime/${role}"
-# Codex reaches models through the local CLIProxyAPI custom provider.
-export CLIPROXY_API_KEY="${CLIPROXY_API_KEY:-8954049ec4301505d30a40bb04b8707dfa5ae8787eead7e6}"
+
+# Codex reaches models through the local CLIProxyAPI custom provider. The key
+# is read from the proxy config rather than copied here, so rotating it there
+# is enough; an exported CLIPROXY_API_KEY wins.
+if [ -z "${CLIPROXY_API_KEY:-}" ]; then
+  CLIPROXY_API_KEY="$(sed -n '/^api-keys:/,/^[A-Za-z#]/p' \
+    /opt/homebrew/etc/cliproxyapi.conf 2>/dev/null |
+    grep -oE '[A-Za-z0-9]{32,}' | head -1)"
+  if [ -z "$CLIPROXY_API_KEY" ]; then
+    printf 'codex-room: cannot read an api-key from cliproxyapi.conf; refusing to start %s without a CLIProxyAPI credential\n' "$role" >&2
+    exit 3
+  fi
+fi
+export CLIPROXY_API_KEY
 
 # The peer-zen and review roles talk straight to OpenCode Zen instead of
 # CLIProxyAPI, because CLIProxyAPI 7.2.120 drops the SSE terminator events for
 # gpt-5.6-luna (the model both roles carry) and Codex then never finalises an
 # item — the seat announces a tool call and silently never runs it. See the
 # zen provider in ~/.codex/config.toml for the full account. Once CLIProxyAPI
-# is fixed: delete this branch for peer-zen, that provider, the peer-zen entry
-# in codex-room-sync, and codex-peer-zen in ~/.paseo/config.json; the review
-# role stays but moves back to the CLIProxyAPI path.
-#
-# The key is read from the proxy config rather than copied, so rotating it
-# there is enough.
+# is fixed: delete this branch for peer-zen, that provider, the peer-zen
+# overlay, and codex-peer-zen in ~/.paseo/config.json; the review role stays
+# but moves back to the CLIProxyAPI path.
 override=()
 if [ "$role" = "peer-zen" ] || [ "$role" = "review" ]; then
   zen_key="$(sed -n '/name: OpenCodeGo/,/models:/p' \

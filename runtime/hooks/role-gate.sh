@@ -8,9 +8,11 @@
 # denied, including skills installed later. Sessions without ROOM_ROLE
 # (ordinary human sessions) stay untouched — the gate governs seats only.
 #
-# Seat skill surface is narrow by construction: profiles/shared.settings.json
-# disables every plugin, so a seat sees only project skills
-# (trusty-bot/.claude/skills), user skills (~/.claude/skills), and built-ins.
+# Seat skill surface is narrow by construction: seats run in isolated
+# profile homes (~/.claude/profiles/claude-<role>) where no plugins are
+# installed and profiles/settings.json disables them besides, so a seat sees
+# only project skills (trusty-bot/.claude/skills), user skills (the profile's
+# skills symlink -> ~/.claude/skills), and built-ins.
 # A skill from a disabled plugin is unreachable regardless of these lists.
 set -euo pipefail
 
@@ -48,7 +50,7 @@ case "$tool" in
       lead|peer)
         target="$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$payload")"
         case "$target" in
-          "$HOME/.claude/projects/"*)
+          "$HOME/.claude/projects/"*|"$HOME/.claude/profiles/"*"/projects/"*)
             deny "Session memory is supervisor-scoped. Durable findings belong in the handback (or repo docs when the brief says so), not in the auto-memory store."
             ;;
         esac

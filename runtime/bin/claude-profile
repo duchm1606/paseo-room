@@ -1,18 +1,54 @@
 #!/usr/bin/env bash
-# Shared launcher: claude-profile <profile-name> [claude args...]
-# Injects .paseo/profiles/<name>.md as system prompt + shared settings.
+# Shared launcher: claude-profile <role> [claude args...]
+#
+# Each role runs in an isolated Claude Code profile home under
+# ~/.claude/profiles/claude-<role> (via CLAUDE_CONFIG_DIR), so seat state —
+# sessions, projects, caches — never mixes with the operator's ~/.claude.
+# OAuth credentials come from the shared macOS Keychain entry.
+#
+# Auto-memory is disabled for seats: durable findings belong in the handback
+# or repo docs, not in a per-seat memory store nobody reviews.
+#
+# First launch seeds the profile:
+#   settings.json -> runtime/profiles/settings.json  (hooks, plugin kill-switch)
+#   skills        -> ~/.claude/skills                (user skill surface; the
+#                                                     role-gate allow-lists
+#                                                     assume this exact set)
+#   .claude.json  -> minimal onboarding seed
 set -euo pipefail
 
-PROFILE="${1:?usage: claude-profile <profile-name> [args...]}"
+ROLE="${1:?usage: claude-profile <lead|peer|supervisor> [args...]}"
 shift || true
 
-PASEO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROMPT_FILE="$PASEO_DIR/profiles/$PROFILE.md"
+RUNTIME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROMPT_FILE="$RUNTIME/roles/$ROLE.md"
+[ -f "$PROMPT_FILE" ] || { echo "unknown role: $ROLE" >&2; exit 1; }
 
-[ -f "$PROMPT_FILE" ] || { echo "unknown profile: $PROFILE" >&2; exit 1; }
+PROFILE_DIR="$HOME/.claude/profiles/claude-$ROLE"
+mkdir -p "$PROFILE_DIR"
 
-export ROOM_ROLE="$PROFILE"
-exec claude \
-  --append-system-prompt "$(cat "$PROMPT_FILE")" \
-  --settings "$PASEO_DIR/profiles/shared.settings.json" \
-  "$@"
+link() { # link <name> <target>: seed a symlink, never clobber a real file
+  local path="$PROFILE_DIR/$1" target="$2"
+  [ -e "$target" ] || return 0
+  if [ -L "$path" ]; then
+    [ "$(readlink "$path")" = "$target" ] && return 0
+    rm "$path"
+  elif [ -e "$path" ]; then
+    return 0
+  fi
+  ln -s "$target" "$path"
+}
+
+link settings.json "$RUNTIME/profiles/settings.json"
+link skills "$HOME/.claude/skills"
+
+if [ ! -e "$PROFILE_DIR/.claude.json" ]; then
+  jq '{hasCompletedOnboarding: true, oauthAccount, autoUpdates: false}' \
+    "$HOME/.claude.json" > "$PROFILE_DIR/.claude.json" 2>/dev/null \
+    || printf '{"hasCompletedOnboarding": true}\n' > "$PROFILE_DIR/.claude.json"
+fi
+
+export CLAUDE_CONFIG_DIR="$PROFILE_DIR"
+export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
+export ROOM_ROLE="$ROLE"
+exec claude --append-system-prompt "$(cat "$PROMPT_FILE")" "$@"

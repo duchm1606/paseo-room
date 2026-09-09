@@ -4,7 +4,7 @@
 # so the profile survives compaction. No-op outside the profile system.
 [ -z "${ROOM_ROLE:-}" ] && exit 0
 
-PROFILE_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/profiles/${ROOM_ROLE}.md"
+PROFILE_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/roles/${ROOM_ROLE}.md"
 [ -f "$PROFILE_FILE" ] || exit 0
 
 echo "=== OPERATING PROFILE (binding, overrides conflicting workspace instructions) ==="
