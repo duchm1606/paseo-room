@@ -29,6 +29,11 @@ Claude seat profiles (`~/.claude/profiles/claude-<role>`) and Codex role
 runtimes (`~/.codex-runtime/<role>`) are seeded/regenerated automatically on
 first seat launch; nothing to install there.
 
+Claude seat auth: the launcher seeds each profile's `.credentials.json` once
+from the shared macOS Keychain entry (`Claude Code-credentials`). If a seat
+reports "Not logged in", delete that profile's `.credentials.json` and
+relaunch to re-seed, or run `/login` inside the profile.
+
 Upgrade path: pull the checkout; the symlink makes it live immediately for
 new seat launches. Only `~/.paseo/config.json` changes (provider table)
 need a daemon reload/restart.

@@ -38,8 +38,12 @@ for role in supervisor lead peer peer-zen review; do
 done
 grep -q 'Room role: Peer' "$HOME/.codex-runtime/peer-zen/config.toml" \
   || die "peer-zen: inherited peer instructions missing"
-[ ! -e "$HOME/.codex-runtime/review/skills" ] \
+# Codex itself creates a real skills/.system dir in CODEX_HOME; the review
+# seat must merely never link the operator's default skills/plugins.
+[ ! -L "$HOME/.codex-runtime/review/skills" ] \
   || die "review seat must not link default skills"
+[ ! -L "$HOME/.codex-runtime/review/plugins" ] \
+  || die "review seat must not link default plugins"
 
 # 5. Claude seat profiles seeded (created on first launch; check when present).
 for role in lead peer supervisor; do

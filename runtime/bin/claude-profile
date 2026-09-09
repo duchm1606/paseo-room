@@ -48,6 +48,28 @@ if [ ! -e "$PROFILE_DIR/.claude.json" ]; then
     || printf '{"hasCompletedOnboarding": true}\n' > "$PROFILE_DIR/.claude.json"
 fi
 
+# Isolated profiles do not see the operator's Keychain-scoped login; seed a
+# file credential once from the shared Keychain entry. If a seat ever reports
+# "Not logged in", delete the profile's .credentials.json and relaunch to
+# re-seed (or run /login in that profile).
+if [ ! -e "$PROFILE_DIR/.credentials.json" ]; then
+  if cred="$(security find-generic-password -s 'Claude Code-credentials' -a "$USER" -w 2>/dev/null)"; then
+    (umask 177; printf '%s\n' "$cred" > "$PROFILE_DIR/.credentials.json")
+  fi
+fi
+
+# Trust the launch directory: seats are only spawned into owner-created
+# workspaces, and an untrusted dir silently drops project allow rules.
+if [ -e "$PROFILE_DIR/.claude.json" ] && command -v jq >/dev/null; then
+  tmp="$(mktemp "$PROFILE_DIR/.claude.json.XXXXXX")"
+  if jq --arg d "$PWD" '.projects[$d].hasTrustDialogAccepted = true' \
+    "$PROFILE_DIR/.claude.json" > "$tmp" 2>/dev/null; then
+    mv "$tmp" "$PROFILE_DIR/.claude.json"
+  else
+    rm -f "$tmp"
+  fi
+fi
+
 export CLAUDE_CONFIG_DIR="$PROFILE_DIR"
 export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
 export ROOM_ROLE="$ROLE"

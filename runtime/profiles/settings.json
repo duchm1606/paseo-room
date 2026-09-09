@@ -1,13 +1,6 @@
 {
-  "enabledPlugins": {
-    "duck@swekit": false,
-    "mattpocock-skills@mattpocock": false,
-    "obsidian@obsidian-skills": false,
-    "code-review@claude-plugins-official": false,
-    "superpowers@claude-plugins-official": false,
-    "sentry@claude-plugins-official": false,
-    "aikido@claude-plugins-official": false,
-    "atlassian@claude-plugins-official": false
+  "env": {
+    "DISABLE_AUTOUPDATER": "1"
   },
   "hooks": {
     "PreToolUse": [
@@ -60,5 +53,15 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "duck@swekit": false,
+    "mattpocock-skills@mattpocock": false,
+    "obsidian@obsidian-skills": false,
+    "code-review@claude-plugins-official": false,
+    "superpowers@claude-plugins-official": false,
+    "sentry@claude-plugins-official": false,
+    "aikido@claude-plugins-official": false,
+    "atlassian@claude-plugins-official": false
   }
 }
