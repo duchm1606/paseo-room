@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Shared launcher: claude-profile <profile-name> [claude args...]
+# Injects .paseo/profiles/<name>.md as system prompt + shared settings.
+set -euo pipefail
+
+PROFILE="${1:?usage: claude-profile <profile-name> [args...]}"
+shift || true
+
+PASEO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROMPT_FILE="$PASEO_DIR/profiles/$PROFILE.md"
+
+[ -f "$PROMPT_FILE" ] || { echo "unknown profile: $PROFILE" >&2; exit 1; }
+
+export ROOM_ROLE="$PROFILE"
+exec claude \
+  --append-system-prompt "$(cat "$PROMPT_FILE")" \
+  --settings "$PASEO_DIR/profiles/shared.settings.json" \
+  "$@"
