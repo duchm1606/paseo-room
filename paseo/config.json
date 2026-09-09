@@ -6,8 +6,7 @@
       "injectIntoAgents": true,
       "injectIntoProviders": [
         "lead",
-        "supervisor",
-        "codex-supervisor"
+        "supervisor"
       ]
     },
     "browserTools": {
@@ -224,27 +223,6 @@
           "Agent",
           "Workflow",
           "mcp__paseo"
-        ]
-      },
-      "codex-supervisor": {
-        "extends": "codex",
-        "label": "Codex Supervisor (watcher)",
-        "description": "Cheap watcher seat on an off-catalog model. Unlike every other codex-* provider this one is listed in daemon.mcp.injectIntoProviders, because a watcher that cannot wake the supervisor-of-record is useless. Carries deepseek-v4-flash (DeepInfra via CLIProxyAPI). Off-catalog: Codex reports a context window that is not its own, so keep it on bounded read-and-report work and never trust its context budgeting.",
-        "command": [
-          "/Users/duchoang/.local/bin/codex-room",
-          "supervisor"
-        ],
-        "models": [
-          {
-            "id": "deepseek-v4-flash",
-            "label": "DeepSeek V4 Flash (watch)",
-            "isDefault": true
-          }
-        ],
-        "disallowedTools": [
-          "Task",
-          "Agent",
-          "Workflow"
         ]
       }
     }
