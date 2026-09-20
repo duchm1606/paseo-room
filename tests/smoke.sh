@@ -14,7 +14,8 @@ ROOM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 2. Scripts parse.
 bash -n "$ROOM/bin/claude-profile" "$ROOM/bin/claude-lead" "$ROOM/bin/claude-peer" \
-  "$ROOM/bin/claude-supervisor" "$HOME/.local/bin/codex-room" "$ROOM"/hooks/*.sh \
+  "$ROOM/bin/claude-supervisor" "$ROOM/bin/claude-seat-token" \
+  "$HOME/.local/bin/codex-room" "$ROOM"/hooks/*.sh \
   || die "bash -n on launchers/hooks"
 python3 -m py_compile "$HOME/.local/bin/codex-room-sync" || die "codex-room-sync py_compile"
 
@@ -26,7 +27,7 @@ outside="$(jq -r '.agents.providers | to_entries[] | select(.value.command) | .v
 [ -z "$outside" ] || die "unexpected provider command: $outside"
 
 # 4. Codex role overlays present, runtime generation per role.
-for role in supervisor lead peer peer-zen review; do
+for role in supervisor lead peer peer-zen; do
   [ -f "$HOME/.codex/$role.config.toml" ] || { die "$role: overlay missing in ~/.codex"; continue; }
   if ! "$HOME/.local/bin/codex-room-sync" "$role" 2>/dev/null; then
     die "codex-room-sync $role"

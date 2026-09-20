@@ -1,0 +1,552 @@
+#!/usr/bin/env bash
+# claude-seat-token — rotate the long-lived CLAUDE_CODE_OAUTH_TOKEN of the
+# Claude role seats, one seat at a time or all at once.
+#
+# Why this exists
+#   Every role seat authenticates with its own static `claude setup-token`
+#   value (owner directive 2026-09-10), stored at
+#       ~/.claude/profiles/claude-<role>/settings.json -> .env.CLAUDE_CODE_OAUTH_TOKEN
+#   and a freshly seeded seat copies the shared template
+#       ~/.claude/profiles/settings.json
+#   Rotating by hand means editing up to four JSON files without breaking the
+#   contract bin/claude-profile enforces: a real file (never a symlink) whose
+#   token starts with sk-ant-oat, or the seat refuses to start.
+#
+# What this adds over `jq -i`
+#   - named keys kept in a mode-600 registry, so a rotation is `set k2 --all`
+#   - the token is probed against the API before any file is touched
+#   - writes are atomic, mode 600, with a one-deep .prev for `undo`
+#   - reports the live agents still running on the previous token
+#
+# The operator's own ~/.claude/settings.json is deliberately NOT a target: it
+# authenticates with its Keychain /login and the owner wants no long-lived
+# token on it. `--operator` overrides that for the base `claude` provider seat.
+set -euo pipefail
+
+PROFILES_DIR="${CLAUDE_PROFILES_DIR:-$HOME/.claude/profiles}"
+REGISTRY="${CLAUDE_SEAT_TOKEN_REGISTRY:-$PROFILES_DIR/tokens.json}"
+OPERATOR_SETTINGS="${CLAUDE_OPERATOR_SETTINGS:-$HOME/.claude/settings.json}"
+SEATS="lead peer supervisor"
+API_URL="https://api.anthropic.com/v1/models?limit=1"
+
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  C_DIM=$'\033[2m'; C_B=$'\033[1m'; C_G=$'\033[32m'; C_Y=$'\033[33m'; C_R=$'\033[31m'; C_0=$'\033[0m'
+else
+  C_DIM=""; C_B=""; C_G=""; C_Y=""; C_R=""; C_0=""
+fi
+
+die() { local code="$1"; shift; printf '%sclaude-seat-token: %s%s\n' "$C_R" "$*" "$C_0" >&2; exit "$code"; }
+warn() { printf '%s! %s%s\n' "$C_Y" "$*" "$C_0" >&2; }
+need() { command -v "$1" >/dev/null 2>&1 || die 1 "missing dependency: $1"; }
+
+target_path() {
+  case "$1" in
+    lead|peer|supervisor) printf '%s/claude-%s/settings.json' "$PROFILES_DIR" "$1" ;;
+    template)             printf '%s/settings.json' "$PROFILES_DIR" ;;
+    operator)             printf '%s' "$OPERATOR_SETTINGS" ;;
+    *) return 1 ;;
+  esac
+}
+
+valid_token() {
+  case "$1" in
+    sk-ant-oat*) ;;
+    *) return 1 ;;
+  esac
+  case "$1" in
+    *[[:space:]]*) return 1 ;;
+  esac
+  [ "${#1}" -ge 50 ]
+}
+
+fingerprint() { printf '%s' "$1" | shasum -a 256 | cut -c1-8; }
+
+mask() {
+  local t="$1"
+  if [ "${#t}" -le 24 ]; then printf '%s' "$t"; else printf '%s...%s' "${t:0:14}" "${t: -6}"; fi
+}
+
+read_token() { # read_token <path>
+  [ -f "$1" ] || { printf ''; return 0; }
+  jq -r '.env.CLAUDE_CODE_OAUTH_TOKEN // ""' "$1" 2>/dev/null || printf ''
+}
+
+# ---------------------------------------------------------------- registry ---
+
+registry_init() {
+  if [ -f "$REGISTRY" ]; then return 0; fi
+  ( umask 077; printf '{"keys":{}}\n' > "$REGISTRY" )
+  chmod 600 "$REGISTRY"
+}
+
+registry_write() { # registry_write <json-on-stdin>
+  local tmp
+  tmp="$(mktemp "$(dirname "$REGISTRY")/.tokens.json.XXXXXX")"
+  chmod 600 "$tmp"
+  cat > "$tmp"
+  jq -e . "$tmp" >/dev/null 2>&1 || { rm -f "$tmp"; die 1 "refusing to write a malformed registry"; }
+  mv "$tmp" "$REGISTRY"
+  chmod 600 "$REGISTRY"
+}
+
+key_token() { # key_token <alias> -> token or empty
+  registry_init
+  jq -r --arg a "$1" '.keys[$a].token // ""' "$REGISTRY"
+}
+
+alias_for() { # alias_for <token> -> first matching alias or empty
+  registry_init
+  jq -r --arg t "$1" 'first(.keys | to_entries[] | select(.value.token == $t) | .key) // ""' "$REGISTRY"
+}
+
+key_aliases() {
+  registry_init
+  jq -r '.keys | keys[]' "$REGISTRY"
+}
+
+# ------------------------------------------------------------------ probe ---
+
+LAST_HTTP=""
+probe_token() { # 0 = alive, 1 = rejected, 2 = inconclusive
+  local token="$1" cfg code
+  command -v curl >/dev/null 2>&1 || { LAST_HTTP="no-curl"; return 2; }
+  cfg="$(mktemp)"; chmod 600 "$cfg"
+  # Headers go through a 600 config file so the token never lands in `ps`.
+  printf 'header = "Authorization: Bearer %s"\nheader = "anthropic-version: 2023-06-01"\n' "$token" > "$cfg"
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 --config "$cfg" "$API_URL" 2>/dev/null || printf '000')"
+  rm -f "$cfg"
+  LAST_HTTP="$code"
+  case "$code" in
+    200) return 0 ;;
+    401|403) return 1 ;;
+    *) return 2 ;;
+  esac
+}
+
+# ------------------------------------------------------------------ agents ---
+
+paseo_ok() { command -v paseo >/dev/null 2>&1; }
+
+live_agents() { # live_agents <seat> [all|running] -> "id<TAB>status<TAB>name"
+  local seat="$1" scope="${2:-all}"
+  paseo_ok || return 0
+  paseo ls --json 2>/dev/null | jq -r --arg s "$seat" --arg scope "$scope" '
+    (if type == "object" then (.agents // []) else . end)[]
+    | select((.provider // "" | split("/")[0]) == $s)
+    | select(if $scope == "running" then .status == "running"
+             else (.status == "running" or .status == "idle") end)
+    | [.id, .status, (.name // "" | gsub("[\t\n]"; " ") | .[0:48])] | @tsv' 2>/dev/null || true
+}
+
+# -------------------------------------------------------------------- write ---
+
+preflight() { # preflight <target...> — refuse the whole run if any target is unusable
+  local name path
+  for name in "$@"; do
+    path="$(target_path "$name")" || die 1 "unknown target: $name"
+    if [ -L "$path" ]; then
+      die 3 "$name: $path is a symlink; claude-profile refuses that (each seat needs its own real settings.json). Nothing was written."
+    fi
+    if [ ! -f "$path" ]; then
+      die 3 "$name: $path does not exist. Seed it from $PROFILES_DIR/settings.json first. Nothing was written."
+    fi
+    jq -e . "$path" >/dev/null 2>&1 || die 3 "$name: $path is not valid JSON. Nothing was written."
+  done
+}
+
+write_seat() { # write_seat <target> <token>
+  local name="$1" token="$2" path dir tmp
+  path="$(target_path "$name")" || die 1 "unknown target: $name"
+  if [ -L "$path" ]; then
+    die 3 "$name: $path is a symlink; claude-profile refuses that. Replace it with a real file first."
+  fi
+  if [ ! -f "$path" ]; then
+    die 3 "$name: $path does not exist. Seed it from $PROFILES_DIR/settings.json first."
+  fi
+  jq -e . "$path" >/dev/null 2>&1 || die 3 "$name: $path is not valid JSON; refusing to rewrite it."
+  dir="$(dirname "$path")"
+  tmp="$(mktemp "$dir/.settings.json.XXXXXX")"
+  chmod 600 "$tmp"
+  if ! jq --arg t "$token" '.env = ((.env // {}) + {CLAUDE_CODE_OAUTH_TOKEN: $t})' "$path" > "$tmp"; then
+    rm -f "$tmp"; die 1 "$name: jq failed; $path left untouched."
+  fi
+  if [ "$(jq -r '.env.CLAUDE_CODE_OAUTH_TOKEN // ""' "$tmp")" != "$token" ]; then
+    rm -f "$tmp"; die 1 "$name: post-write verification failed; $path left untouched."
+  fi
+  cp "$path" "$path.prev"
+  chmod 600 "$path.prev"
+  mv "$tmp" "$path"
+  chmod 600 "$path"
+}
+
+undo_seat() { # undo_seat <target>
+  local name="$1" path prev dir keep tmp
+  path="$(target_path "$name")" || die 1 "unknown target: $name"
+  prev="$path.prev"
+  [ -f "$prev" ] || die 1 "$name: no $prev to restore."
+  jq -e . "$prev" >/dev/null 2>&1 || die 1 "$name: $prev is not valid JSON."
+  dir="$(dirname "$path")"
+  keep="$(mktemp "$dir/.settings.json.XXXXXX")"; chmod 600 "$keep"
+  tmp="$(mktemp "$dir/.settings.json.XXXXXX")"; chmod 600 "$tmp"
+  cp "$path" "$keep"
+  cp "$prev" "$tmp"
+  mv "$tmp" "$path"; chmod 600 "$path"
+  mv "$keep" "$prev"; chmod 600 "$prev"   # undo stays a toggle
+}
+
+# --------------------------------------------------------------- commands ---
+
+cmd_list() {
+  local live_hint="" name path token al fp upd cnt run none_txt
+  registry_init
+  printf '%s%-11s %-10s %-9s %-24s %-17s %s%s\n' "$C_B" "TARGET" "KEY" "FPRINT" "TOKEN" "UPDATED" "LIVE" "$C_0"
+  for name in $SEATS template operator; do
+    path="$(target_path "$name")"
+    if [ ! -f "$path" ]; then
+      printf '%-11s %s%s%s\n' "$name" "$C_DIM" "(no settings.json at $path)" "$C_0"; continue
+    fi
+    token="$(read_token "$path")"
+    if [ -z "$token" ]; then
+      al="-"; fp="-"
+    else
+      al="$(alias_for "$token")"; [ -n "$al" ] || al="unknown"
+      fp="$(fingerprint "$token")"
+    fi
+    upd="$(date -r "$path" '+%Y-%m-%d %H:%M' 2>/dev/null || printf '?')"
+    if [ "$name" = "template" ] || [ "$name" = "operator" ]; then
+      cnt="-"
+    elif paseo_ok; then
+      run="$(live_agents "$name" running | wc -l | tr -d ' ')"
+      cnt="$(live_agents "$name" all | wc -l | tr -d ' ')"
+      cnt="$cnt (${run} running)"
+      live_hint=1
+    else
+      cnt="?"
+    fi
+    if [ -z "$token" ]; then
+      if [ "$name" = "operator" ]; then none_txt="(none - Keychain /login)"; else none_txt="(none - seat cannot start)"; fi
+      printf '%-11s %-10s %-9s %s%-24s%s %-17s %s\n' "$name" "$al" "$fp" "$C_DIM" "$none_txt" "$C_0" "$upd" "$cnt"
+    else
+      printf '%-11s %-10s %-9s %-24s %-17s %s\n' "$name" "$al" "$fp" "$(mask "$token")" "$upd" "$cnt"
+    fi
+  done
+  if [ -z "$(read_token "$OPERATOR_SETTINGS")" ]; then
+    printf '%s\noperator = your own ~/.claude; it uses the Keychain /login by design and is skipped unless you pass --operator.%s\n' "$C_DIM" "$C_0"
+  fi
+  if [ -n "$live_hint" ]; then printf '%sLIVE counts idle+running agents on that seat; they keep the old token until reloaded.%s\n' "$C_DIM" "$C_0"; fi
+  return 0
+}
+
+cmd_keys() {
+  local sub="${1:-list}"; shift || true
+  registry_init
+  case "$sub" in
+    list|ls)
+      local a t fp note used name
+      if [ -z "$(key_aliases)" ]; then
+        printf '%sno keys registered yet — add one with: claude-seat-token keys add <alias>%s\n' "$C_DIM" "$C_0"; return 0
+      fi
+      printf '%s%-10s %-9s %-24s %-30s %s%s\n' "$C_B" "KEY" "FPRINT" "TOKEN" "IN USE BY" "NOTE" "$C_0"
+      for a in $(key_aliases); do
+        t="$(key_token "$a")"; fp="$(fingerprint "$t")"
+        note="$(jq -r --arg a "$a" '.keys[$a].note // ""' "$REGISTRY")"
+        used=""
+        for name in $SEATS template; do
+          if [ "$(read_token "$(target_path "$name")")" = "$t" ]; then used="$used$name,"; fi
+        done
+        used="${used%,}"; [ -n "$used" ] || used="-"
+        printf '%-10s %-9s %-24s %-30s %s\n' "$a" "$fp" "$(mask "$t")" "$used" "$note"
+      done
+      ;;
+    add)
+      local alias="" token="" note="" from_stdin=""
+      alias="${1:-}"; shift || true
+      [ -n "$alias" ] || die 1 "usage: claude-seat-token keys add <alias> [--token X | --stdin] [--note \"...\"]"
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --token) token="${2:-}"; shift 2 ;;
+          --stdin) from_stdin=1; shift ;;
+          --note)  note="${2:-}"; shift 2 ;;
+          *) die 1 "unknown flag for keys add: $1" ;;
+        esac
+      done
+      if [ -n "$from_stdin" ]; then
+        IFS= read -r token || true
+      elif [ -z "$token" ]; then
+        [ -t 0 ] || die 1 "no TTY: pass --token or --stdin"
+        printf 'Paste the token for %s (input hidden): ' "$alias" >&2
+        IFS= read -rs token < /dev/tty; printf '\n' >&2
+      fi
+      token="$(printf '%s' "$token" | tr -d '[:space:]')"
+      valid_token "$token" || die 1 "that does not look like a setup-token (expected sk-ant-oat…, no spaces)"
+      if probe_token "$token"; then :; else
+        case "$?" in
+          1) die 1 "the API rejected that token (HTTP $LAST_HTTP); not registering it" ;;
+          *) warn "could not verify the token (HTTP $LAST_HTTP); registering it unverified" ;;
+        esac
+      fi
+      jq --arg a "$alias" --arg t "$token" --arg n "$note" --arg d "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        '.keys[$a] = {token: $t, note: $n, added: $d}' "$REGISTRY" | registry_write
+      printf '%s✓%s registered key %s%s%s (%s)\n' "$C_G" "$C_0" "$C_B" "$alias" "$C_0" "$(fingerprint "$token")"
+      ;;
+    rm|remove)
+      local alias="${1:-}"
+      [ -n "$alias" ] || die 1 "usage: claude-seat-token keys rm <alias>"
+      [ -n "$(key_token "$alias")" ] || die 1 "no such key: $alias"
+      jq --arg a "$alias" 'del(.keys[$a])' "$REGISTRY" | registry_write
+      printf '%s✓%s removed key %s\n' "$C_G" "$C_0" "$alias"
+      ;;
+    *) die 1 "usage: claude-seat-token keys [list|add|rm]" ;;
+  esac
+}
+
+cmd_check() {
+  local which="${1:-}" a t name path rc
+  registry_init
+  if [ -z "$which" ] || [ "$which" = "--all" ]; then
+    for a in $(key_aliases); do
+      t="$(key_token "$a")"
+      if probe_token "$t"; then rc="${C_G}alive${C_0}"; else
+        if [ $? -eq 1 ]; then rc="${C_R}REJECTED${C_0}"; else rc="${C_Y}unknown${C_0}"; fi
+      fi
+      printf 'key  %-11s %-9s %b (HTTP %s)\n' "$a" "$(fingerprint "$t")" "$rc" "$LAST_HTTP"
+    done
+    for name in $SEATS template; do
+      path="$(target_path "$name")"; t="$(read_token "$path")"
+      if [ -z "$t" ]; then printf 'seat %-11s %s\n' "$name" "no token"; continue; fi
+      if probe_token "$t"; then rc="${C_G}alive${C_0}"; else
+        if [ $? -eq 1 ]; then rc="${C_R}REJECTED${C_0}"; else rc="${C_Y}unknown${C_0}"; fi
+      fi
+      printf 'seat %-11s %-9s %b (HTTP %s)\n' "$name" "$(fingerprint "$t")" "$rc" "$LAST_HTTP"
+    done
+    return 0
+  fi
+  t="$(key_token "$which")"; [ -n "$t" ] || t="$which"
+  valid_token "$t" || die 1 "unknown key and not a token: $which"
+  if probe_token "$t"; then printf '%salive%s (HTTP %s)\n' "$C_G" "$C_0" "$LAST_HTTP"; else
+    if [ $? -eq 1 ]; then die 1 "REJECTED (HTTP $LAST_HTTP)"; fi
+    die 1 "inconclusive (HTTP $LAST_HTTP)"
+  fi
+}
+
+do_reload() { # do_reload <agent-id>
+  if paseo agent reload "$1" >/dev/null 2>&1; then
+    printf '    %s↻ reloaded%s\n' "$C_G" "$C_0"
+  else
+    printf '    %s↻ reload failed — run: paseo agent reload %s%s\n' "$C_Y" "$1" "$C_0"
+  fi
+}
+
+report_live() { # report_live <reload-mode> <targets...>
+  local mode="$1"; shift
+  local name line id status agentname any=""
+  paseo_ok || return 0
+  for name in "$@"; do
+    case "$name" in lead|peer|supervisor) ;; *) continue ;; esac
+    while IFS=$'\t' read -r id status agentname; do
+      [ -n "$id" ] || continue
+      if [ -z "$any" ]; then
+        printf '\n%sLive agents still holding the previous token:%s\n' "$C_Y" "$C_0"; any=1
+      fi
+      printf '  %-10s %-8s %s %s\n' "$name" "$status" "${id:0:8}" "$agentname"
+      case "$mode" in
+        running) if [ "$status" = "running" ]; then do_reload "$id"; fi ;;
+        all)     do_reload "$id" ;;
+      esac
+    done <<EOF
+$(live_agents "$name" all)
+EOF
+  done
+  if [ -n "$any" ] && [ "$mode" = "none" ]; then
+    printf '%s  A seat reads settings.json only at start. Reload with --reload (running only) or --reload-all,\n  or: paseo agent reload <id>%s\n' "$C_DIM" "$C_0"
+  fi
+  return 0
+}
+
+cmd_set() {
+  local key_arg="" targets="" all="" reload="none" dry="" verify=1 save_as="" with_operator=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --seat|--seats) targets="$targets $(printf '%s' "${2:-}" | tr ',' ' ')"; shift 2 ;;
+      --all) all=1; shift ;;
+      --operator) with_operator=1; shift ;;
+      --reload) reload="running"; shift ;;
+      --reload-all) reload="all"; shift ;;
+      --dry-run|-n) dry=1; shift ;;
+      --no-verify) verify=""; shift ;;
+      --save-as) save_as="${2:-}"; shift 2 ;;
+      -*) die 1 "unknown flag: $1" ;;
+      *) [ -z "$key_arg" ] && key_arg="$1" || die 1 "unexpected argument: $1"; shift ;;
+    esac
+  done
+  [ -n "$key_arg" ] || die 1 "usage: claude-seat-token set <alias|sk-ant-oat…> [--seat lead,peer | --all] [--reload]"
+
+  local token alias_name
+  token="$(key_token "$key_arg")"
+  if [ -n "$token" ]; then
+    alias_name="$key_arg"
+  else
+    token="$(printf '%s' "$key_arg" | tr -d '[:space:]')"
+    valid_token "$token" || die 1 "unknown key '$key_arg' and not a valid token. Known keys: $(key_aliases | tr '\n' ' ')"
+    alias_name="$(alias_for "$token")"; [ -n "$alias_name" ] || alias_name="(unregistered)"
+  fi
+
+  if [ -n "$all" ]; then targets="$SEATS template"; fi
+  if [ -n "$with_operator" ]; then targets="$targets operator"; fi
+  targets="$(printf '%s' "$targets" | tr -s ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' ')"
+  [ -n "$targets" ] || die 1 "pick targets: --seat lead[,peer,supervisor,template] or --all"
+  local t
+  for t in $targets; do target_path "$t" >/dev/null || die 1 "unknown target '$t' (valid: $SEATS template operator)"; done
+  preflight $targets
+
+  if [ -n "$verify" ]; then
+    if probe_token "$token"; then
+      printf '%s✓%s token %s (%s) verified alive\n' "$C_G" "$C_0" "$alias_name" "$(fingerprint "$token")"
+    else
+      if [ $? -eq 1 ]; then die 1 "the API rejected this token (HTTP $LAST_HTTP); no seat was touched. Mint a new one with \`claude setup-token\`."; fi
+      warn "could not verify the token (HTTP $LAST_HTTP); continuing"
+    fi
+  fi
+
+  local changed="" cur
+  for t in $targets; do
+    cur="$(read_token "$(target_path "$t")")"
+    if [ "$cur" = "$token" ]; then
+      printf '  %-11s %sunchanged%s\n' "$t" "$C_DIM" "$C_0"; continue
+    fi
+    if [ -n "$dry" ]; then
+      printf '  %-11s %swould set%s %s → %s\n' "$t" "$C_Y" "$C_0" "$(fingerprint "${cur:-none}")" "$(fingerprint "$token")"
+      continue
+    fi
+    write_seat "$t" "$token"
+    printf '  %s✓%s %-11s %s → %s\n' "$C_G" "$C_0" "$t" "$(fingerprint "${cur:-none}")" "$(fingerprint "$token")"
+    changed="$changed $t"
+  done
+
+  if [ -n "$save_as" ] && [ -z "$dry" ]; then
+    jq --arg a "$save_as" --arg tk "$token" --arg d "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+      '.keys[$a] = {token: $tk, note: (.keys[$a].note // ""), added: $d}' "$REGISTRY" | registry_write
+    printf '%s✓%s saved as key %s\n' "$C_G" "$C_0" "$save_as"
+  fi
+
+  if [ -n "$changed" ]; then report_live "$reload" $changed; fi
+  return 0
+}
+
+cmd_undo() {
+  local targets="" t
+  if [ "${1:-}" = "--all" ]; then targets="$SEATS template"; else
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --seat|--seats) targets="$targets $(printf '%s' "${2:-}" | tr ',' ' ')"; shift 2 ;;
+        *) targets="$targets $1"; shift ;;
+      esac
+    done
+  fi
+  [ -n "$targets" ] || die 1 "usage: claude-seat-token undo <seat…|--all>"
+  preflight $targets
+  for t in $targets; do
+    undo_seat "$t"
+    printf '  %s↩%s %-11s restored → %s\n' "$C_G" "$C_0" "$t" "$(fingerprint "$(read_token "$(target_path "$t")")")"
+  done
+  report_live none $targets
+}
+
+cmd_interactive() {
+  local aliases n i a t choice sel targets
+  registry_init
+  cmd_list
+  printf '\n'
+  aliases="$(key_aliases)"
+  if [ -z "$aliases" ]; then
+    printf 'No keys registered. Add one first:\n  claude-seat-token keys add k1\n'
+    return 1
+  fi
+  printf '%sWhich token?%s\n' "$C_B" "$C_0"
+  i=0
+  for a in $aliases; do
+    i=$((i+1)); t="$(key_token "$a")"
+    printf '  %d) %-10s %-9s %s\n' "$i" "$a" "$(fingerprint "$t")" "$(mask "$t")"
+  done
+  printf '  p) paste a token instead\n'
+  printf 'choice: '; IFS= read -r choice < /dev/tty
+  if [ "$choice" = "p" ]; then
+    printf 'Paste token (hidden): '; IFS= read -rs sel < /dev/tty; printf '\n'
+  else
+    n=0; sel=""
+    for a in $aliases; do n=$((n+1)); if [ "$n" = "$choice" ]; then sel="$a"; fi; done
+    [ -n "$sel" ] || die 1 "no such choice: $choice"
+  fi
+  printf '\n%sWhich seats?%s\n  1) lead\n  2) peer\n  3) supervisor\n  4) template (seed for new seats)\n  a) all four\n' "$C_B" "$C_0"
+  printf 'choice (comma-separated ok): '; IFS= read -r choice < /dev/tty
+  targets=""
+  case "$choice" in
+    a|all) targets="--all" ;;
+    *)
+      for i in $(printf '%s' "$choice" | tr ',' ' '); do
+        case "$i" in
+          1) targets="$targets,lead" ;;
+          2) targets="$targets,peer" ;;
+          3) targets="$targets,supervisor" ;;
+          4) targets="$targets,template" ;;
+          lead|peer|supervisor|template) targets="$targets,$i" ;;
+          *) die 1 "no such seat choice: $i" ;;
+        esac
+      done
+      targets="--seat ${targets#,}" ;;
+  esac
+  printf '\n'
+  cmd_set "$sel" $targets
+}
+
+usage() {
+  cat <<'EOF'
+claude-seat-token — rotate the long-lived CLAUDE_CODE_OAUTH_TOKEN of the Claude seats.
+
+USAGE
+  claude-seat-token                          interactive: pick a key, pick seats
+  claude-seat-token list                     show every seat, its key and fingerprint
+  claude-seat-token keys                     show registered keys and where they are used
+  claude-seat-token keys add <alias>         register a key (hidden prompt; or --token/--stdin)
+  claude-seat-token keys rm <alias>          forget a key
+  claude-seat-token set <alias|token> ...    write a token to seats
+  claude-seat-token check [alias|--all]      probe tokens against the API
+  claude-seat-token undo <seat…|--all>       restore the previous token (toggles)
+
+SET FLAGS
+  --seat lead,peer     target named seats: lead | peer | supervisor | template
+  --all                all three seats + the template seed
+  --operator           also write ~/.claude/settings.json (off by default: your own
+                       Claude uses the Keychain /login and should hold no static token)
+  --reload             reload running agents on the touched seats afterwards
+  --reload-all         reload running AND idle agents on those seats
+  --dry-run, -n        show what would change, write nothing
+  --no-verify          skip the API probe (default: probe before writing anything)
+  --save-as <alias>    remember a pasted token under this alias
+
+EXAMPLES
+  claude-seat-token keys add k1              # paste key 1, verified then stored
+  claude-seat-token set k2 --all --reload    # rotate every seat to key 2, reload live ones
+  claude-seat-token set k1 --seat peer       # peer on key 1, lead/supervisor untouched
+  claude-seat-token set sk-ant-oat01-… --seat lead --save-as k3
+  claude-seat-token undo --all               # back to the previous values
+
+NOTES
+  Keys live in ~/.claude/profiles/tokens.json (mode 600). Each write keeps one
+  settings.json.prev next to the file it replaced. A seat reads settings.json only
+  at process start, so a running agent keeps the old token until it is reloaded.
+  Mint a fresh token with `claude setup-token` (one year, model requests only).
+EOF
+}
+
+need jq
+case "${1:-}" in
+  ""|menu)       cmd_interactive ;;
+  list|ls|status) shift; cmd_list ;;
+  keys)          shift; cmd_keys "$@" ;;
+  set|use|switch) shift; cmd_set "$@" ;;
+  check|verify)  shift; cmd_check "$@" ;;
+  undo|revert)   shift; cmd_undo "$@" ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; die 1 "unknown command: $1" ;;
+esac
