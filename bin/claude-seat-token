@@ -454,6 +454,12 @@ cmd_undo() {
 
 cmd_interactive() {
   local aliases n i a t choice sel targets
+  # Every prompt below reads /dev/tty. Without one the reads fail silently and
+  # the run ends looking successful, so refuse up front and name the way out.
+  if ! { exec 3</dev/tty; } 2>/dev/null; then
+    die 1 "the menu needs a terminal; run it in a shell, or say it outright: claude-seat-token set <key> --seat lead[,peer,supervisor,template] (or --all)"
+  fi
+  exec 3<&-
   registry_init
   cmd_list
   printf '\n'
@@ -504,12 +510,13 @@ usage() {
 claude-seat-token — rotate the long-lived CLAUDE_CODE_OAUTH_TOKEN of the Claude seats.
 
 USAGE
-  claude-seat-token                          interactive: pick a key, pick seats
-  claude-seat-token list                     show every seat, its key and fingerprint
+  claude-seat-token                          show every seat, its key and fingerprint
+  claude-seat-token menu                     interactive: pick a key, pick seats
+  claude-seat-token list                     same as no arguments
   claude-seat-token keys                     show registered keys and where they are used
   claude-seat-token keys add <alias>         register a key (hidden prompt; or --token/--stdin)
   claude-seat-token keys rm <alias>          forget a key
-  claude-seat-token set <alias|token> ...    write a token to seats
+  claude-seat-token set <alias|token> ...    write a token to seats (no args: menu)
   claude-seat-token check [alias|--all]      probe tokens against the API
   claude-seat-token undo <seat…|--all>       restore the previous token (toggles)
 
@@ -541,10 +548,15 @@ EOF
 
 need jq
 case "${1:-}" in
-  ""|menu)       cmd_interactive ;;
-  list|ls|status) shift; cmd_list ;;
+  "")            cmd_list
+                 printf '\n%sseat-token menu%s   guided rotation   %sseat-token help%s   every command\n' \
+                   "$C_B" "$C_0" "$C_B" "$C_0" ;;
+  list|ls|status) cmd_list ;;
+  menu|-i|--interactive) cmd_interactive ;;
   keys)          shift; cmd_keys "$@" ;;
-  set|use|switch) shift; cmd_set "$@" ;;
+  set|use|switch) shift
+                 # `set` with nothing to set is an intent, not an error.
+                 if [ "$#" -eq 0 ]; then cmd_interactive; else cmd_set "$@"; fi ;;
   check|verify)  shift; cmd_check "$@" ;;
   undo|revert)   shift; cmd_undo "$@" ;;
   help|-h|--help) usage ;;
