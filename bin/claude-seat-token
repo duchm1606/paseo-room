@@ -135,6 +135,73 @@ probe_token() { # 0 = alive, 1 = rejected, 2 = inconclusive
   esac
 }
 
+# ------------------------------------------------------------------ usage ---
+#
+# A setup-token cannot read /api/oauth/usage — that needs the user:profile
+# scope these tokens do not carry (403), which is the same wall that keeps
+# them off connectors. The numbers do come back on an ordinary model call, in
+# the anthropic-ratelimit-unified-* headers, so ask for the smallest possible
+# one: one output token from the cheapest model. That is a real request and it
+# counts toward the very window it reports, which is why this is its own
+# command and not part of `check`.
+
+PROBE_MODEL="${SEAT_TOKEN_PROBE_MODEL:-claude-haiku-4-5-20251001}"
+
+usage_row() { # usage_row <label> <token> <seats-using-it>
+  local label="$1" token="$2" used="$3" cfg hdr code org u5 u7 r5 r7 st
+  cfg="$(mktemp)"; chmod 600 "$cfg"
+  printf 'header = "Authorization: Bearer %s"\nheader = "anthropic-version: 2023-06-01"\nheader = "content-type: application/json"\n' "$token" > "$cfg"
+  hdr="$(mktemp)"
+  code="$(curl -sS -D "$hdr" -o /dev/null -w '%{http_code}' --max-time 30 --config "$cfg" \
+    -X POST "https://api.anthropic.com/v1/messages" \
+    -d "{\"model\":\"$PROBE_MODEL\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\".\"}]}" 2>/dev/null || printf '000')"
+  rm -f "$cfg"
+  h() { grep -i "^$1:" "$hdr" | tr -d '\r' | cut -d' ' -f2- | tail -1; }
+  org="$(h anthropic-organization-id)"; org="${org:0:8}"
+  u5="$(h anthropic-ratelimit-unified-5h-utilization)"
+  u7="$(h anthropic-ratelimit-unified-7d-utilization)"
+  r5="$(h anthropic-ratelimit-unified-5h-reset)"
+  r7="$(h anthropic-ratelimit-unified-7d-reset)"
+  st="$(h anthropic-ratelimit-unified-status)"
+  rm -f "$hdr"
+  if [ -z "$u5" ]; then
+    printf '%-10s %-9s %s\n' "$label" "${org:--}" "no rate-limit headers (HTTP $code)"
+    return 0
+  fi
+  pct() { awk -v v="$1" 'BEGIN{ if (v == "") print "-"; else printf "%.0f%%", v*100 }'; }
+  when() { [ -n "$1" ] && date -r "$1" '+%m-%d %H:%M' 2>/dev/null || printf '-'; }
+  printf '%-10s %-9s %-6s %-6s %-12s %-12s %-8s %s\n' \
+    "$label" "$org" "$(pct "$u5")" "$(pct "$u7")" "$(when "$r5")" "$(when "$r7")" "${st:--}" "$used"
+}
+
+cmd_usage() {
+  local which="${1:-}" a t used name seen=""
+  registry_init
+  printf '%s%-10s %-9s %-6s %-6s %-12s %-12s %-8s %s%s\n' "$C_B" \
+    "KEY" "ORG" "5H" "7D" "5H RESETS" "7D RESETS" "STATUS" "ON SEATS" "$C_0"
+  for a in $(key_aliases); do
+    t="$(key_token "$a")"
+    [ -z "$which" ] || [ "$which" = "$a" ] || continue
+    used=""
+    for name in $SEATS template; do
+      if [ "$(read_token "$(target_path "$name")")" = "$t" ]; then used="$used$name,"; fi
+    done
+    usage_row "$a" "$t" "${used%,}"
+    seen="$seen$(fingerprint "$t") "
+  done
+  [ -n "$which" ] && return 0
+  # A seat can carry a token nobody named; it still spends a quota.
+  for name in $SEATS; do
+    t="$(read_token "$(target_path "$name")")"
+    [ -n "$t" ] || continue
+    case "$seen" in *"$(fingerprint "$t")"*) continue ;; esac
+    usage_row "seat:$name" "$t" "$name"
+    seen="$seen$(fingerprint "$t") "
+  done
+  printf '%sEach row costs one 1-token request on that key, which itself counts toward the 5h window.%s\n' "$C_DIM" "$C_0"
+  return 0
+}
+
 # ------------------------------------------------------------------ agents ---
 
 paseo_ok() { command -v paseo >/dev/null 2>&1; }
@@ -512,7 +579,9 @@ USAGE
   claude-seat-token keys note <alias> <text> set or change a key's note
   claude-seat-token keys rm <alias>          forget a key
   claude-seat-token set <alias|token> ...    write a token to seats (no args: menu)
-  claude-seat-token check [alias|--all]      probe tokens against the API
+  claude-seat-token check [alias|--all]      probe tokens against the API (free, no model call)
+  claude-seat-token usage [alias]            5h / 7d rate-limit utilisation per key
+                                             (costs one 1-token model request each)
 
 SET FLAGS
   --seat lead,peer     target named seats: lead | peer | supervisor | template
@@ -552,6 +621,7 @@ case "${1:-}" in
                  # `set` with nothing to set is an intent, not an error.
                  if [ "$#" -eq 0 ]; then cmd_interactive; else cmd_set "$@"; fi ;;
   check|verify)  shift; cmd_check "$@" ;;
+  usage|quota)   shift; cmd_usage "${1:-}" ;;
   undo|revert)   die 1 "undo is gone: it had to keep a second copy of the outgoing token on disk. Name the key you want instead — claude-seat-token set <alias> --seat <seat> (or --all)" ;;
   help|-h|--help) usage ;;
   *) usage >&2; die 1 "unknown command: $1" ;;
