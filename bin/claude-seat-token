@@ -61,6 +61,18 @@ valid_token() {
 
 fingerprint() { printf '%s' "$1" | shasum -a 256 | cut -c1-8; }
 
+redact() { # an error message must not reprint the secret it is complaining about
+  case "$1" in
+    sk-ant-oat*) printf '%s…(redacted, %s)' "${1:0:14}" "$(fingerprint "$1")" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+argv_token_warning() {
+  warn "that token came from the command line, so your shell just recorded it in \$HISTFILE."
+  warn "scrub it with: sed -i '' '/sk-ant-oat/d' \"\$HISTFILE\"   (and next time omit the token: the prompt is hidden)"
+}
+
 mask() {
   local t="$1"
   if [ "${#t}" -le 24 ]; then printf '%s' "$t"; else printf '%s...%s' "${t:0:14}" "${t: -6}"; fi
@@ -262,12 +274,14 @@ cmd_keys() {
       local alias="" token="" note="" note_set="" from_stdin="" keep=""
       alias="${1:-}"; shift || true
       [ -n "$alias" ] || die 1 "usage: claude-seat-token keys add <alias> [--token X | --stdin] [--note \"...\"]"
+      local from_argv=""
       while [ $# -gt 0 ]; do
         case "$1" in
-          --token) token="${2:-}"; shift 2 ;;
+          --token) token="${2:-}"; from_argv=1; shift 2 ;;
           --stdin) from_stdin=1; shift ;;
           --note)  note="${2:-}"; note_set=1; shift 2 ;;
-          *) die 1 "unknown flag for keys add: $1" ;;
+          sk-ant-oat*) token="$1"; from_argv=1; shift ;;   # positional token
+          *) die 1 "unknown argument for keys add: $(redact "$1")" ;;
         esac
       done
       if [ -n "$from_stdin" ]; then
@@ -289,6 +303,7 @@ cmd_keys() {
       jq --arg a "$alias" --arg t "$token" --arg n "$keep" --arg d "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
         '.keys[$a] = {token: $t, note: $n, added: $d}' "$REGISTRY" | registry_write
       printf '%s✓%s registered key %s%s%s (%s)\n' "$C_G" "$C_0" "$C_B" "$alias" "$C_0" "$(fingerprint "$token")"
+      [ -n "$from_argv" ] && argv_token_warning || true
       ;;
     note)
       local alias="${1:-}"; shift || true
@@ -384,7 +399,7 @@ cmd_set() {
       --no-verify) verify=""; shift ;;
       --save-as) save_as="${2:-}"; shift 2 ;;
       -*) die 1 "unknown flag: $1" ;;
-      *) [ -z "$key_arg" ] && key_arg="$1" || die 1 "unexpected argument: $1"; shift ;;
+      *) [ -z "$key_arg" ] && key_arg="$1" || die 1 "unexpected argument: $(redact "$1")"; shift ;;
     esac
   done
   [ -n "$key_arg" ] || die 1 "usage: claude-seat-token set <alias|sk-ant-oat…> [--seat lead,peer | --all] [--reload]"
@@ -395,8 +410,9 @@ cmd_set() {
     alias_name="$key_arg"
   else
     token="$(printf '%s' "$key_arg" | tr -d '[:space:]')"
-    valid_token "$token" || die 1 "unknown key '$key_arg' and not a valid token. Known keys: $(key_aliases | tr '\n' ' ')"
+    valid_token "$token" || die 1 "unknown key '$(redact "$key_arg")' and not a valid token. Known keys: $(key_aliases | tr '\n' ' ')"
     alias_name="$(alias_for "$token")"; [ -n "$alias_name" ] || alias_name="(unregistered)"
+    argv_token_warning
   fi
 
   if [ -n "$all" ]; then targets="$SEATS template"; fi
@@ -522,7 +538,10 @@ USAGE
   claude-seat-token menu                     interactive: pick a key, pick seats
   claude-seat-token list                     same as no arguments
   claude-seat-token keys                     show registered keys and where they are used
-  claude-seat-token keys add <alias>         register a key (hidden prompt; or --token/--stdin)
+  claude-seat-token keys add <alias>         register a key — asks for it with a hidden prompt,
+                                             which keeps it out of your shell history. A token
+                                             given as an argument or --token works too, with a
+                                             warning; --stdin reads it from a pipe.
   claude-seat-token keys note <alias> <text> set or change a key's note
   claude-seat-token keys rm <alias>          forget a key
   claude-seat-token set <alias|token> ...    write a token to seats (no args: menu)
