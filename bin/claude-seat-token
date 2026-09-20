@@ -15,7 +15,7 @@
 # What this adds over `jq -i`
 #   - named keys kept in a mode-600 registry, so a rotation is `set k2 --all`
 #   - the token is probed against the API before any file is touched
-#   - writes are atomic, mode 600, with a one-deep .prev for `undo`
+#   - writes are atomic and mode 600, and keep no copy of the outgoing token
 #   - reports the live agents still running on the previous token
 #
 # The operator's own ~/.claude/settings.json is deliberately NOT a target: it
@@ -185,25 +185,8 @@ write_seat() { # write_seat <target> <token>
   if [ "$(jq -r '.env.CLAUDE_CODE_OAUTH_TOKEN // ""' "$tmp")" != "$token" ]; then
     rm -f "$tmp"; die 1 "$name: post-write verification failed; $path left untouched."
   fi
-  cp "$path" "$path.prev"
-  chmod 600 "$path.prev"
   mv "$tmp" "$path"
   chmod 600 "$path"
-}
-
-undo_seat() { # undo_seat <target>
-  local name="$1" path prev dir keep tmp
-  path="$(target_path "$name")" || die 1 "unknown target: $name"
-  prev="$path.prev"
-  [ -f "$prev" ] || die 1 "$name: no $prev to restore."
-  jq -e . "$prev" >/dev/null 2>&1 || die 1 "$name: $prev is not valid JSON."
-  dir="$(dirname "$path")"
-  keep="$(mktemp "$dir/.settings.json.XXXXXX")"; chmod 600 "$keep"
-  tmp="$(mktemp "$dir/.settings.json.XXXXXX")"; chmod 600 "$tmp"
-  cp "$path" "$keep"
-  cp "$prev" "$tmp"
-  mv "$tmp" "$path"; chmod 600 "$path"
-  mv "$keep" "$prev"; chmod 600 "$prev"   # undo stays a toggle
 }
 
 # --------------------------------------------------------------- commands ---
@@ -413,6 +396,9 @@ cmd_set() {
     valid_token "$token" || die 1 "unknown key '$(redact "$key_arg")' and not a valid token. Known keys: $(key_aliases | tr '\n' ' ')"
     alias_name="$(alias_for "$token")"; [ -n "$alias_name" ] || alias_name="(unregistered)"
     argv_token_warning
+    if [ "$alias_name" = "(unregistered)" ]; then
+      warn "this token is not in the registry; add --save-as <alias> if you want to be able to name it later"
+    fi
   fi
 
   if [ -n "$all" ]; then targets="$SEATS template"; fi
@@ -455,25 +441,6 @@ cmd_set() {
 
   if [ -n "$changed" ]; then report_live "$reload" $changed; fi
   return 0
-}
-
-cmd_undo() {
-  local targets="" t
-  if [ "${1:-}" = "--all" ]; then targets="$SEATS template"; else
-    while [ $# -gt 0 ]; do
-      case "$1" in
-        --seat|--seats) targets="$targets $(printf '%s' "${2:-}" | tr ',' ' ')"; shift 2 ;;
-        *) targets="$targets $1"; shift ;;
-      esac
-    done
-  fi
-  [ -n "$targets" ] || die 1 "usage: claude-seat-token undo <seat…|--all>"
-  preflight $targets
-  for t in $targets; do
-    undo_seat "$t"
-    printf '  %s↩%s %-11s restored → %s\n' "$C_G" "$C_0" "$t" "$(fingerprint "$(read_token "$(target_path "$t")")")"
-  done
-  report_live none $targets
 }
 
 cmd_interactive() {
@@ -546,7 +513,6 @@ USAGE
   claude-seat-token keys rm <alias>          forget a key
   claude-seat-token set <alias|token> ...    write a token to seats (no args: menu)
   claude-seat-token check [alias|--all]      probe tokens against the API
-  claude-seat-token undo <seat…|--all>       restore the previous token (toggles)
 
 SET FLAGS
   --seat lead,peer     target named seats: lead | peer | supervisor | template
@@ -564,12 +530,12 @@ EXAMPLES
   claude-seat-token set k2 --all --reload    # rotate every seat to key 2, reload live ones
   claude-seat-token set k1 --seat peer       # peer on key 1, lead/supervisor untouched
   claude-seat-token set sk-ant-oat01-… --seat lead --save-as k3
-  claude-seat-token undo --all               # back to the previous values
 
 NOTES
-  Keys live in ~/.claude/profiles/tokens.json (mode 600). Each write keeps one
-  settings.json.prev next to the file it replaced. A seat reads settings.json only
-  at process start, so a running agent keeps the old token until it is reloaded.
+  Keys live in ~/.claude/profiles/tokens.json (mode 600) and nowhere else: a write
+  replaces a seat's token, it keeps no copy of the old one. To go back, name the key
+  you want. A seat reads settings.json only at process start, so a running agent
+  keeps the old token until it is reloaded.
   Mint a fresh token with `claude setup-token` (one year, model requests only).
 EOF
 }
@@ -586,7 +552,7 @@ case "${1:-}" in
                  # `set` with nothing to set is an intent, not an error.
                  if [ "$#" -eq 0 ]; then cmd_interactive; else cmd_set "$@"; fi ;;
   check|verify)  shift; cmd_check "$@" ;;
-  undo|revert)   shift; cmd_undo "$@" ;;
+  undo|revert)   die 1 "undo is gone: it had to keep a second copy of the outgoing token on disk. Name the key you want instead — claude-seat-token set <alias> --seat <seat> (or --all)" ;;
   help|-h|--help) usage ;;
   *) usage >&2; die 1 "unknown command: $1" ;;
 esac
