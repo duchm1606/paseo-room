@@ -259,14 +259,14 @@ cmd_keys() {
       done
       ;;
     add)
-      local alias="" token="" note="" from_stdin=""
+      local alias="" token="" note="" note_set="" from_stdin="" keep=""
       alias="${1:-}"; shift || true
       [ -n "$alias" ] || die 1 "usage: claude-seat-token keys add <alias> [--token X | --stdin] [--note \"...\"]"
       while [ $# -gt 0 ]; do
         case "$1" in
           --token) token="${2:-}"; shift 2 ;;
           --stdin) from_stdin=1; shift ;;
-          --note)  note="${2:-}"; shift 2 ;;
+          --note)  note="${2:-}"; note_set=1; shift 2 ;;
           *) die 1 "unknown flag for keys add: $1" ;;
         esac
       done
@@ -285,9 +285,17 @@ cmd_keys() {
           *) warn "could not verify the token (HTTP $LAST_HTTP); registering it unverified" ;;
         esac
       fi
-      jq --arg a "$alias" --arg t "$token" --arg n "$note" --arg d "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+      if [ -n "$note_set" ]; then keep="$note"; else keep="$(jq -r --arg a "$alias" '.keys[$a].note // ""' "$REGISTRY")"; fi
+      jq --arg a "$alias" --arg t "$token" --arg n "$keep" --arg d "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
         '.keys[$a] = {token: $t, note: $n, added: $d}' "$REGISTRY" | registry_write
       printf '%s✓%s registered key %s%s%s (%s)\n' "$C_G" "$C_0" "$C_B" "$alias" "$C_0" "$(fingerprint "$token")"
+      ;;
+    note)
+      local alias="${1:-}"; shift || true
+      [ -n "$alias" ] || die 1 "usage: claude-seat-token keys note <alias> <text>"
+      [ -n "$(key_token "$alias")" ] || die 1 "no such key: $alias"
+      jq --arg a "$alias" --arg n "$*" '.keys[$a].note = $n' "$REGISTRY" | registry_write
+      printf '%s✓%s note for %s%s%s: %s\n' "$C_G" "$C_0" "$C_B" "$alias" "$C_0" "$*"
       ;;
     rm|remove)
       local alias="${1:-}"
@@ -296,7 +304,7 @@ cmd_keys() {
       jq --arg a "$alias" 'del(.keys[$a])' "$REGISTRY" | registry_write
       printf '%s✓%s removed key %s\n' "$C_G" "$C_0" "$alias"
       ;;
-    *) die 1 "usage: claude-seat-token keys [list|add|rm]" ;;
+    *) die 1 "usage: claude-seat-token keys [list|add|note|rm]" ;;
   esac
 }
 
@@ -515,6 +523,7 @@ USAGE
   claude-seat-token list                     same as no arguments
   claude-seat-token keys                     show registered keys and where they are used
   claude-seat-token keys add <alias>         register a key (hidden prompt; or --token/--stdin)
+  claude-seat-token keys note <alias> <text> set or change a key's note
   claude-seat-token keys rm <alias>          forget a key
   claude-seat-token set <alias|token> ...    write a token to seats (no args: menu)
   claude-seat-token check [alias|--all]      probe tokens against the API
