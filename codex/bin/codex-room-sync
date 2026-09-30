@@ -12,6 +12,9 @@ overrides; a developer_instructions triple-quoted block is the role prompt.
 Room directives (consumed here, never written to the merged config):
   room_link_default_skills = false   -> do not link ~/.codex skills/plugins
   room_instructions_from = "<role>"  -> inherit that overlay's instructions
+  room_instructions_file = "<path>"  -> instructions are that file (~ expands),
+                                        so a Codex seat and a Claude seat can
+                                        share one roles/<role>.md
 """
 
 import json
@@ -132,8 +135,14 @@ def main() -> None:
     overlay = overlay_path.read_text()
     scalars = overlay_scalars(overlay)
     instructions_role = scalars.pop("room_instructions_from", None)
+    instructions_file = scalars.pop("room_instructions_file", None)
     link_default_skills = scalars.pop("room_link_default_skills", "true") != "false"
-    if instructions_role is not None:
+    if instructions_file is not None:
+        source = pathlib.Path(os.path.expanduser(unquote(instructions_file)))
+        instructions = source.read_text().rstrip("\n")
+        if '"""' in instructions or "\\" in instructions:
+            raise SystemExit(f"{source}: triple quotes or backslashes cannot go in a TOML basic string")
+    elif instructions_role is not None:
         source = codex_home / f"{unquote(instructions_role)}.config.toml"
         instructions = overlay_instructions(source.read_text(), source)
     else:

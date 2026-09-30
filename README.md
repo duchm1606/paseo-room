@@ -9,13 +9,15 @@ one machine; GitHub carries it between machines.
 ~/.paseo/orchestration/        THIS checkout (master), same path on every host
 ├── bin/                       claude-{lead,peer,supervisor}, claude-profile,
 │                              claude-seat-token, room-install, room-sync
-├── roles/                     Claude role prompts (lead|peer|supervisor.md)
+├── roles/                     role law: lead, peer (Claude and Codex seats),
+│                              supervisor, watcher
 ├── hooks/                     Claude seat hooks (role-gate, inject, telemetry)
 ├── protocol/                  room doctrine (workspace protocol, handoff, ...)
 ├── skills/                    the seat skill set (seats see only these)
 ├── hosts/<host>.json          provider table per host (mac, duckling-oci)
 ├── claude/seat-settings.json  seat settings minus the token
 ├── codex/                     codex-room, codex-room-sync, peer overlay
+├── watcher/                   Watcher tool gate (agy PreToolUse hook)
 ├── PHILOSOPHY.md TARGET.md SUPERVISOR_NOTEBOOK.md
 ├── telemetry/  attic/         operational data + old backups (gitignored)
 └── tests/smoke.sh
@@ -28,6 +30,8 @@ Installed by room-install (symlink or rendered copy):
 ~/.claude/profiles/claude-<role>/skills  -> skills/
 ~/.local/bin/codex-room{,-sync}          -> codex/bin/
 ~/.codex/peer.{config.toml,catalog-extra.json} -> codex/
+~/.paseo/watcher/AGENTS.md               -> roles/watcher.md
+~/.paseo/watcher/.agents/{hooks.json,watcher-gate.sh} -> watcher/
 ```
 
 Host-local and never synced: `~/.codex/config.toml` (Codex base, provider
@@ -84,10 +88,25 @@ Seats see only `skills/` plus Claude Code built-ins and repo project skills;
 base `~/.codex/config.toml` + overlay `~/.codex/<role>.config.toml` ->
 merged `config.toml`, plus a model catalog patched to disable Codex-native
 agents and floor reasoning at high. Only `peer` is wired to a provider
-(`codex-peer`); its overlay is versioned here.
+(`codex-peer`); its overlay is versioned here and takes its instructions
+from `roles/peer.md` (`room_instructions_file`), the same law the Claude
+peer seat runs.
 
 Never edit a generated `config.toml` — change the base or the overlay and
 relaunch (or run `codex-room-sync <role>`).
+
+## Watcher seat
+
+`watcher` (Mac only) is a Gemini seat on the agy-acp bridge that the
+Supervisor starts per supervised workspace and feeds PATROL letters; it
+judges Lead and Peer activity against the patterns in `roles/watcher.md`
+and answers only the Supervisor. ACP seats cannot take
+`--append-system-prompt`, so the provider passes
+`--add-dir ~/.paseo/watcher` to agy, which loads that directory's
+`AGENTS.md` as rules and `.agents/hooks.json` as a PreToolUse gate. The
+gate denies every tool except `paseo ls|logs|inspect`. The directory
+must stay outside any git repository (agy would also load the repo's
+`AGENTS.md`), and the seat must be started with it as working directory.
 
 ## Verify
 

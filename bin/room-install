@@ -15,6 +15,8 @@
 #   skills/                  <- ~/.claude/profiles/claude-<role>/skills (symlink)
 #   codex/bin/*              <- ~/.local/bin/codex-room{,-sync}  (symlinks)
 #   codex/peer.*             <- ~/.codex/peer.{config.toml,catalog-extra.json}
+#   roles/watcher.md, watcher/ <- ~/.paseo/watcher/{AGENTS.md,.agents/}  (Watcher
+#                                law and tool gate, loaded by agy --add-dir)
 #
 # Secrets never live in the repo. A seat settings file that does not exist yet
 # takes its CLAUDE_CODE_OAUTH_TOKEN from the seat template, else from the
@@ -69,6 +71,15 @@ if [ "$uses_codex_room" = true ]; then
   place "$HOME/.local/bin/codex-room-sync" "$ROOM/codex/bin/codex-room-sync"
   place "$HOME/.codex/peer.config.toml" "$ROOM/codex/peer.config.toml"
   place "$HOME/.codex/peer.catalog-extra.json" "$ROOM/codex/peer.catalog-extra.json"
+fi
+
+# 1b. Watcher law directory, only where a `watcher` provider exists. It must
+#     sit outside any git repository: agy walks from it to the repo root and
+#     would load that repo's AGENTS.md as rules too.
+if [ "$(jq -r '.agents.providers | has("watcher")' <<<"$rendered")" = true ]; then
+  place "$HOME/.paseo/watcher/AGENTS.md" "$ROOM/roles/watcher.md"
+  place "$HOME/.paseo/watcher/.agents/hooks.json" "$ROOM/watcher/hooks.json"
+  place "$HOME/.paseo/watcher/.agents/watcher-gate.sh" "$ROOM/watcher/watcher-gate.sh"
 fi
 
 # 2. Claude seat settings: managed keys from the repo, token from the file.

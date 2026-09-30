@@ -18,7 +18,7 @@ CODEX_ROOM="$HOME/.local/bin/codex-room"
 bash -n "$ROOM/bin/claude-profile" "$ROOM/bin/claude-lead" "$ROOM/bin/claude-peer" \
   "$ROOM/bin/claude-supervisor" "$ROOM/bin/claude-seat-token" \
   "$ROOM/bin/room-install" "$ROOM/bin/room-sync" \
-  "$ROOM/codex/bin/codex-room" "$ROOM"/hooks/*.sh \
+  "$ROOM/codex/bin/codex-room" "$ROOM"/hooks/*.sh "$ROOM/watcher/watcher-gate.sh" \
   || die "bash -n on launchers/hooks"
 python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$ROOM/codex/bin/codex-room-sync" \
   || die "codex-room-sync does not parse"
@@ -69,6 +69,22 @@ if [ -n "$host" ]; then
     | {pluginsEnabled, plugins, providers: .agents.providers}' "$ROOM/hosts/$host.json")"
   have="$(jq -S '{pluginsEnabled, plugins, providers: .agents.providers}' "$HOME/.paseo/config.json")"
   [ "$want" = "$have" ] || die "~/.paseo/config.json drifted from hosts/$host.json (run bin/room-install, or move the edit into the repo)"
+fi
+
+# 4b'. Watcher: law and gate linked where the provider exists, the directory
+#      outside any git repository, and the gate denies what it must.
+if jq -e '.agents.providers | has("watcher")' "$HOME/.paseo/config.json" >/dev/null; then
+  w="$HOME/.paseo/watcher"
+  [ "$(readlink "$w/AGENTS.md")" = "$ROOM/roles/watcher.md" ] || die "watcher: $w/AGENTS.md not linked to roles/watcher.md"
+  [ "$(readlink "$w/.agents/hooks.json")" = "$ROOM/watcher/hooks.json" ] || die "watcher: hooks.json not linked"
+  [ "$(readlink "$w/.agents/watcher-gate.sh")" = "$ROOM/watcher/watcher-gate.sh" ] || die "watcher: gate not linked"
+  ! git -C "$w" rev-parse --git-dir >/dev/null 2>&1 || die "watcher: $w is inside a git repository; agy would load its AGENTS.md"
+  gate() { jq -cn --arg n "$1" --arg c "$2" '{toolCall:{name:$n,args:{CommandLine:$c}}}' | "$ROOM/watcher/watcher-gate.sh" | jq -r .decision; }
+  [ "$(gate run_command 'paseo logs abc --tail 20')" = allow ] || die "watcher gate blocks paseo logs"
+  for bad in 'paseo send abc hi' 'paseo ls; touch x' 'paseo logs abc -f' "$(printf 'paseo ls\ntouch x')"; do
+    [ "$(gate run_command "$bad")" = deny ] || die "watcher gate allows: $bad"
+  done
+  [ "$(gate view_file '')" = deny ] || die "watcher gate allows view_file"
 fi
 
 # 4c. Room skills are well-formed: one SKILL.md per directory, named after it.

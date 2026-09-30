@@ -1,0 +1,7 @@
+{
+  "watcher-gate": {
+    "PreToolUse": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "./watcher-gate.sh", "timeout": 10}]}
+    ]
+  }
+}
