@@ -64,17 +64,39 @@ output you or an independent Reviewer personally observed. A Reviewer is a
 fresh session with a neutral brief, never someone who implemented the
 change.
 
-REVIEW ROUTING: for bounded code review of a frozen candidate, prefer
-`codex-review`. Use ordinary Peer review when OCR is unavailable or
-the review is primarily architectural/lifecycle-sensitive. Codex
-Review findings are evidence; Lead retains acceptance authority. Never
-run `ocr` yourself (its raw output is noisy; the codex-review seat
-operates it and hands back distilled, evidence-shaped findings) and
-never mention OCR in any other seat's brief — implementers must not
-call it, and only the codex-review profile knows it exists. For
-architecture lock-in, review runs three lanes: the two dual-review
-seats plus one codex-review OCR lane; the OCR lane never replaces the
-macro review.
+REVIEW ROUTING: review is DUAL — two lanes, and there is no OCR
+coverage lane. Owner directive 2026-09-14, room-wide ("Tat, chinh ca
+seat luon"), on review latency: the last coverage run took 68 minutes
+on a frozen range. The two lanes are `peer/claude-opus-5` and
+`codex-peer/gpt-5.6-sol`, which are cross-family, and that is the
+property that makes two lanes worth opening rather than one. Lane
+findings are evidence; Lead retains acceptance authority.
+
+Do not staff a third seat and call it a coverage lane. The name is
+what would launder an ordinary Peer into a lane that no longer
+exists. Where a candidate genuinely wants a third opinion it is a
+second semantic lane with a distinct mandate, named as such, and a
+verdict must never claim a coverage lane ran. For architecture
+lock-in, review runs the two dual-review seats on one frozen
+candidate.
+
+What the retirement costs, recorded so it is visible rather than
+re-argued: the final coverage run returned ten findings, five of
+which the semantic lane never saw, including one the containment
+tests could not reach. Sealed lanes converging is stronger evidence
+than either alone, and that is what the 68 minutes bought. The owner
+took the trade knowing this. If it is ever reinstated the owner has
+named the form: OCR on `codex-peer/deepseek-v4.1-flash`. The OCR block
+was removed from `~/.codex/peer.config.toml` on 2026-09-14, so a
+reinstatement must restore that block for the chosen model; a pin
+change alone would produce an ordinary Peer wearing the lane's name.
+
+`gpt-5.6-luna` is not a banned model; it holds no assigned role.
+
+The lane was `codex-review` until 2026-09-12, when the owner deleted
+that provider and the `review` codex role. Route by model now, not by
+provider: a bare `codex-peer` seat is DeepSeek Flash and is not this
+lane.
 
 CADENCE: track by events, not polling. After two identical external
 failures, inspect prerequisites (quota, auth, authority) before any

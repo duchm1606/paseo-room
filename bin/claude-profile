@@ -3,20 +3,18 @@
 #
 # Each role runs in an isolated Claude Code profile home under
 # ~/.claude/profiles/claude-<role> (via CLAUDE_CONFIG_DIR), so seat state —
-# sessions, projects, caches — never mixes with the operator's ~/.claude.
-# Authentication is CLAUDE_CODE_OAUTH_TOKEN, a one-year subscription token
-# from `claude setup-token` (owner directive 2026-09-09). See the resolution
-# block below for why, and for what it costs.
+# sessions, projects, caches, and now settings — never mixes with the
+# operator's ~/.claude.
 #
 # Auto-memory is disabled for seats: durable findings belong in the handback
 # or repo docs, not in a per-seat memory store nobody reviews.
 #
 # First launch seeds the profile:
-#   settings.json -> ~/.claude/profiles/settings.json (hooks, plugin kill-switch)
 #   skills        -> ~/.claude/skills                (user skill surface; the
 #                                                     role-gate allow-lists
 #                                                     assume this exact set)
 #   .claude.json  -> minimal onboarding seed
+#   settings.json -> NOT seeded; see the auth block below.
 set -euo pipefail
 
 ROLE="${1:?usage: claude-profile <lead|peer|supervisor> [args...]}"
@@ -41,7 +39,6 @@ link() { # link <name> <target>: seed a symlink, never clobber a real file
   ln -s "$target" "$path"
 }
 
-link settings.json "$HOME/.claude/profiles/settings.json"
 link skills "$HOME/.claude/skills"
 
 if [ ! -e "$PROFILE_DIR/.claude.json" ]; then
@@ -50,47 +47,53 @@ if [ ! -e "$PROFILE_DIR/.claude.json" ]; then
     || printf '{"hasCompletedOnboarding": true}\n' > "$PROFILE_DIR/.claude.json"
 fi
 
-# Seat authentication: one long-lived subscription token for every role.
+# Seat authentication: each role carries its own long-lived subscription token
+# in its own settings.json (owner directive 2026-09-10).
 #
-# What this replaces, and why. Each profile used to be seeded with a COPY of the
-# operator's Keychain credential. The provider rotates refresh tokens on use, so
-# the first seat to refresh invalidated every other copy, which then persisted
-# blank — seats went hard-down roughly every 8 hours, twice on 2026-09-09, once
-# killing a build kickoff. `CLAUDE_CODE_OAUTH_TOKEN` is a static bearer token:
-# nothing refreshes, so there is no lineage left to invalidate. The failure mode
-# is removed by construction rather than made less likely.
+# What this replaces, and why.
+#   1. Each profile once held a COPY of the operator's Keychain credential. The
+#      provider rotates refresh tokens on use, so the first seat to refresh
+#      invalidated every other copy, which then persisted blank — seats went
+#      hard-down roughly every 8 hours. `claude setup-token` output is a static
+#      bearer token: nothing refreshes, so there is no lineage to invalidate.
+#   2. That token then lived in a single `export` in ~/.zshrc, which this script
+#      grepped. That leaked the long-lived token into every interactive shell of
+#      the operator's own ~/.claude, which the owner wanted off it entirely.
+# Now the token lives only in ~/.claude/profiles/claude-<role>/settings.json
+# (mode 600, real file, never a symlink). The operator's ~/.claude and ~/.zshrc
+# hold no long-lived token; ~/.claude authenticates with its Keychain /login.
 #
 # The cost, so nobody rediscovers it as a bug: a token from `claude setup-token`
 # "can only make model requests" — seats CANNOT establish Remote Control sessions
 # or fetch claude.ai connectors (Notion, Gmail, Drive, Calendar, Excalidraw).
 # Locally configured MCP servers still work. Owner accepted this for all roles.
 #
-# Precedence: the variable sits below ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY /
-# apiKeyHelper and above a /login credential. None of the three higher sources is
-# set in this room; if one ever is, it silently wins and this token is ignored.
+# Rotation is now per-role: `claude setup-token`, then write the new value into
+# each role's settings.json. Three edits instead of one, in exchange for the
+# operator's shell never holding the token.
 #
-# The daemon does not inherit the operator's interactive shell, so an already-set
-# value wins and ~/.zshrc is the fallback source — the owner keeps managing the
-# token in one place. Same shape as codex-room reading its key from the proxy
-# config instead of holding a second copy.
-if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -r "$HOME/.zshrc" ]; then
-  line="$(grep -E '^[[:space:]]*export[[:space:]]+CLAUDE_CODE_OAUTH_TOKEN=' \
-    "$HOME/.zshrc" | tail -1)"
-  token="${line#*=}"
-  token="${token%\"}"; token="${token#\"}"
-  token="${token%\'}"; token="${token#\'}"
-  CLAUDE_CODE_OAUTH_TOKEN="$token"
-fi
-
+# Precedence: settings.json env sits below ANTHROPIC_AUTH_TOKEN /
+# ANTHROPIC_API_KEY / apiKeyHelper and above a /login credential. None of the
+# three higher sources is set in this room; if one ever is, it silently wins and
+# this token is ignored.
+#
 # Fail closed and loudly. Falling back to a /login credential here would work
 # today and silently re-arm the rotation race, which is the whole defect.
-case "${CLAUDE_CODE_OAUTH_TOKEN:-}" in
+SEAT_SETTINGS="$PROFILE_DIR/settings.json"
+if [ ! -f "$SEAT_SETTINGS" ] || [ -L "$SEAT_SETTINGS" ]; then
+  printf 'claude-profile: %s is missing or is a symlink; refusing to start %s.\nEach seat needs its own real settings.json holding its CLAUDE_CODE_OAUTH_TOKEN.\nSeed it from a sibling role, or from %s plus a token minted with `claude setup-token`.\n' \
+    "$SEAT_SETTINGS" "$ROLE" "$HOME/.claude/profiles/settings.json" >&2
+  exit 3
+fi
+seat_token="$(jq -r '.env.CLAUDE_CODE_OAUTH_TOKEN // ""' "$SEAT_SETTINGS" 2>/dev/null || echo "")"
+case "$seat_token" in
   sk-ant-oat*) ;;
-  "") printf 'claude-profile: no CLAUDE_CODE_OAUTH_TOKEN in the environment or ~/.zshrc; refusing to start %s. Mint one with `claude setup-token` and export it from ~/.zshrc.\n' "$ROLE" >&2
+  "") printf 'claude-profile: no env.CLAUDE_CODE_OAUTH_TOKEN in %s; refusing to start %s. Mint one with `claude setup-token` and write it into that file.\n' "$SEAT_SETTINGS" "$ROLE" >&2
       exit 3 ;;
-  *)  printf 'claude-profile: CLAUDE_CODE_OAUTH_TOKEN does not look like a setup-token (expected sk-ant-oat...); refusing to start %s rather than authenticate with a mangled value.\n' "$ROLE" >&2
+  *)  printf 'claude-profile: env.CLAUDE_CODE_OAUTH_TOKEN in %s does not look like a setup-token (expected sk-ant-oat...); refusing to start %s rather than authenticate with a mangled value.\n' "$SEAT_SETTINGS" "$ROLE" >&2
       exit 3 ;;
 esac
+unset seat_token
 
 # Trust the launch directory: seats are only spawned into owner-created
 # workspaces, and an untrusted dir silently drops project allow rules.
@@ -107,5 +110,4 @@ fi
 export CLAUDE_CONFIG_DIR="$PROFILE_DIR"
 export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
 export ROOM_ROLE="$ROLE"
-export CLAUDE_CODE_OAUTH_TOKEN
 exec claude --append-system-prompt "$(cat "$PROMPT_FILE")" "$@"

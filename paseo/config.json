@@ -85,7 +85,7 @@
       "lead": {
         "extends": "claude",
         "label": "Lead-of-record",
-        "description": "Router and binding arbiter — planning, coordination, acceptance",
+        "description": "Router and binding arbiter \u2014 planning, coordination, acceptance",
         "command": [
           "/Users/duchoang/.paseo/orchestration/bin/claude-lead"
         ],
@@ -113,15 +113,14 @@
       "peer": {
         "extends": "claude",
         "label": "Peer",
-        "description": "Independent engineering peer; disposition (Engineer/Architect/Reviewer/Scout) set per task brief",
+        "description": "Independent engineering peer; disposition (Engineer/Architect/Reviewer/Scout) set per task brief. Owner directive 2026-09-12: fast mode stays OFF on this seat too. Here it means the Claude toggle - a different feature from the Codex one on codex-peer, same id, and it was already off on every peer seat. Paseo exposes no provider key that hides it: the Claude provider surfaces it for any model whose manifest carries supportsFastMode, which is every Opus entry below. Dropping the Opus models is the only way to make the toggle disappear and the owner declined that, so the peer keeps Opus and this line is the record.",
         "command": [
           "/Users/duchoang/.paseo/orchestration/bin/claude-peer"
         ],
         "models": [
           {
             "id": "claude-fable-5-1",
-            "label": "Fable 5.1",
-            "isDefault": true
+            "label": "Fable 5.1"
           },
           {
             "id": "claude-fable-5[1m]",
@@ -129,7 +128,8 @@
           },
           {
             "id": "claude-opus-5",
-            "label": "Opus 5 (1M)"
+            "label": "Opus 5 (1M)",
+            "isDefault": true
           },
           {
             "id": "claude-opus-4-8[1m]",
@@ -150,15 +150,15 @@
       "codex-peer": {
         "extends": "codex",
         "label": "Codex Peer",
-        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools",
+        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools. Owner directive 2026-09-12 (second revision): three models - deepseek-v4.1-flash for ordinary engineering and the default, gpt-5.6-sol for heavy work, gpt-5.6-luna for the OCR coverage lane. This supersedes the one-model rule recorded here earlier the same day. That rule stopped a bare `codex-peer` resolving to a DeepSeek default while records read as Sol; the defect is closed differently now - deepseek-v4.1-flash is the declared default in BOTH this table and ~/.codex/peer.config.toml, so the model a seat resolves to and the model its record names are the same value. Keep those two in step. LUNA CARRIES THE OCR LANE: the deleted codex-review provider was the only thing implementing the `executionProfile=review` route the triple-review skill asks for - that string exists nowhere in Paseo, so the skill's coverage lane had no implementation once the provider went. The specialization now lives in ~/.codex/peer.config.toml, gated on gpt-5.6-luna, and ~/.opencodereview is a writable root in ~/.codex/config.toml so preview can persist its session without the danger-full-access the old lane used. Luna's max-thinking rule is enforced by the thinkingOptions below; it previously lived only in the deleted review overlay. FAST MODE STAYS OFF (owner directive 2026-09-12): Codex fast_mode is 'Priority inference at 2x usage' and was found ON for gpt-5.6-sol on three live seats. It defaults to off, so each was turned on deliberately at spawn - do not pass featureValues.fast_mode to create_agent here.",
         "command": [
           "/Users/duchoang/.local/bin/codex-room",
           "peer"
         ],
         "models": [
           {
-            "id": "deepseek-v4-flash",
-            "label": "DeepSeek V4 Flash",
+            "id": "deepseek-v4.1-flash",
+            "label": "DeepSeek V4.1 Flash",
             "isDefault": true
           },
           {
@@ -166,56 +166,15 @@
             "label": "GPT-5.6 Sol"
           },
           {
-            "id": "gpt-5.6-terra",
-            "label": "GPT-5.6 Terra"
-          },
-          {
             "id": "gpt-5.6-luna",
-            "label": "GPT-5.6 Luna"
-          }
-        ],
-        "disallowedTools": [
-          "Task",
-          "Agent",
-          "Workflow",
-          "mcp__paseo"
-        ]
-      },
-      "codex-peer-zen": {
-        "extends": "codex",
-        "label": "Codex Peer (Zen direct)",
-        "description": "Peer seat routed straight to OpenCode Zen, bypassing CLIProxyAPI. Carries gpt-5.6-luna only: it is the one model CLIProxyAPI breaks (dropped SSE terminator events) and also the only one Zen serves with a stream Codex can parse. Every other Zen model is worse on this path — measured 2026-08-08. Remove once CLIProxyAPI is fixed. Owner rule: Luna peers always run with max thinking; the room config now defaults this seat to max reasoning effort.",
-        "command": [
-          "/Users/duchoang/.local/bin/codex-room",
-          "peer-zen"
-        ],
-        "models": [
-          {
-            "id": "gpt-5.6-luna",
-            "label": "GPT-5.6 Luna — bounded scout/impl (Zen direct)",
-            "isDefault": true
-          }
-        ],
-        "disallowedTools": [
-          "Task",
-          "Agent",
-          "Workflow",
-          "mcp__paseo"
-        ]
-      },
-      "codex-review": {
-        "extends": "codex",
-        "label": "Codex Review (OCR lane)",
-        "description": "Dedicated review seat: one Luna Max seat operates Alibaba open-code-review in delegation mode (ocr delegate preview/rule only), inspects the frozen candidate itself, and returns evidence-shaped findings to Lead. Third review lane beside dual review; behaviorally read-only; findings are evidence, Lead retains acceptance. Zen direct because CLIProxyAPI breaks gpt-5.6-luna.",
-        "command": [
-          "/Users/duchoang/.local/bin/codex-room",
-          "review"
-        ],
-        "models": [
-          {
-            "id": "gpt-5.6-luna",
-            "label": "GPT-5.6 Luna — max-effort OCR review (Zen direct)",
-            "isDefault": true
+            "label": "GPT-5.6 Luna",
+            "thinkingOptions": [
+              {
+                "id": "max",
+                "label": "Max",
+                "isDefault": true
+              }
+            ]
           }
         ],
         "disallowedTools": [

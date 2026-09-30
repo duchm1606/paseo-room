@@ -76,10 +76,15 @@ the lock-file write that auto-start needs. Such a seat reports issue state
 - sealed Architect and Reviewer mandates ("dual design / dual review":
   two independent seats across model tiers or providers, one frozen
   candidate, distinct mandates — see protocol/council.md)
-- review runs three lanes: the two dual-review seats plus one
-  `codex-review` OCR delegation lane on the same frozen candidate; the
-  OCR lane produces rule-based evidence and never replaces the macro
+- review runs three lanes: the two dual-review seats plus one OCR
+  delegation lane on the same frozen candidate; the OCR lane produces
+  rule-based evidence and never replaces the macro
   (architectural/lifecycle) review lanes
+  - staff the OCR lane by MODEL, not by provider. On this host it is
+    `codex-peer/gpt-5.6-luna` at max effort; a dedicated
+    `codex-review` provider was deleted 2026-09-12. Instantiate this
+    field against the daemon's current provider table rather than
+    copying the route forward.
 - compare alternatives and reversal conditions
 - Lead issues one binding project verdict
 - Human decides irreversible product/cost trade-offs

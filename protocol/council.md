@@ -9,13 +9,19 @@
 > writable owner while that ownership remains valid.
 >
 > Full review runs three lanes (Demonthorn, 2026-08-09): the two
-> dual-review seats above plus one `codex-review` OCR delegation lane
-> (a dedicated Luna Max seat operating Alibaba open-code-review in
-> delegation mode) on the same frozen candidate. The OCR lane yields
-> rule-based, file-accounted evidence; it is never the macro
+> dual-review seats above plus one OCR delegation lane — a Luna seat
+> at max effort operating Alibaba open-code-review in delegation mode
+> — on the same frozen candidate. The OCR lane yields rule-based,
+> file-accounted evidence; it is never the macro
 > (architectural/lifecycle) review and never replaces either
 > dual-review seat. All three lanes hand findings to Lead, who alone
 > issues the verdict.
+>
+> The lane is routed as `codex-peer/gpt-5.6-luna`. It was a dedicated
+> `codex-review` provider until 2026-09-12, when the owner deleted it
+> and the specialization moved into the peer overlay gated on that
+> model. The topology did not change; only where the lane is staffed
+> from did.
 
 > Read by the Lead when convening a council (TARGET law 6 defines when
 > one is warranted). Source: Demonthorn thread analysis, 2026-08-05.
