@@ -97,7 +97,7 @@ relaunch (or run `codex-room-sync <role>`).
 
 ## Watcher seat
 
-`watcher` (Mac only) is a Gemini seat on the agy-acp bridge that the
+`watcher` is a Gemini seat on the agy-acp bridge that the
 Supervisor starts per supervised workspace and feeds PATROL letters; it
 judges Lead and Peer activity against the patterns in `roles/watcher.md`
 and answers only the Supervisor. ACP seats cannot take
@@ -107,6 +107,20 @@ and answers only the Supervisor. ACP seats cannot take
 gate denies every tool except `paseo ls|logs|inspect`. The directory
 must stay outside any git repository (agy would also load the repo's
 `AGENTS.md`), and the seat must be started with it as working directory.
+
+## Gemini seats (agy)
+
+`gemini-peer`, `gemini-lead`, `gemini-supervisor` and `watcher` run on the
+agy-acp ACP bridge. A host needs, outside this repo:
+
+```bash
+curl -fsSL https://antigravity.google/cli/install.sh | bash   # ~/.local/bin/agy
+# agy-acp: the locally patched tree (~/.local/src/agy-acp, see LOCAL-PATCHES.md)
+cargo build --release && install -m 755 target/release/agy-acp ~/.local/bin/
+# Google sign-in: run `agy` once interactively (SSH prints a login URL), or
+# copy ~/.gemini/antigravity-cli/antigravity-oauth-token (mode 600) from a
+# signed-in host.
+```
 
 ## Verify
 

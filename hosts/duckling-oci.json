@@ -198,6 +198,102 @@
             ]
           }
         ]
+      },
+      "gemini-peer": {
+        "extends": "acp",
+        "label": "Gemini Peer",
+        "description": "duckling-oci: agy 1.2.14 linux_arm64 from the official installer at ~/.local/bin/agy; agy-acp built on the host from ~/.local/src/agy-acp (the locally patched tree, see its LOCAL-PATCHES.md); Google sign-in copied from the Mac token file. PATH carries ~/.npm-global/bin for the paseo CLI. Otherwise identical to the Mac entry: Bounded engineering/scout collaborator on Gemini via the agy-acp ACP bridge. Mirrors codex-peer's shape: no Paseo tools. Enforced by params.supportsMcpServers=false, which is the ONLY lever that works here - `disallowedTools:['mcp__paseo']`, the mechanism used on peer and codex-peer, does not reach an ACP client. MCP is therefore all-or-nothing on this seat, and it is off. Built on Paseo's generic ACP branch (extends:'acp' -> GenericACPAgentClient). THREE PROPERTIES OF THAT BRANCH ARE LOAD-BEARING AND WERE VERIFIED IN THE SHIPPED SOURCE, not assumed: (1) the acp branch builds its client from {logger,command,env,providerId,label,providerParams} only, so `disallowedTools` on this entry would be silently DROPPED - it is deliberately absent here rather than present and inert; (2) the derived definition carries modes:[] and defaultModeId:null, so this seat has NO permission modes - plan-mode pinning is unavailable and the ACP agent's own prompt flow is the only gate; (3) neither acp-agent.js nor generic-acp-agent.js reads systemPrompt or appendSystemPrompt, so ~/.paseo/orchestration/roles/*.md CANNOT be injected into this seat by any Paseo mechanism. A seat here therefore carries no role law, no role-gate.sh (a Claude Code PreToolUse hook), and no ~/.claude/skills surface. PREREQUISITE, MET 2026-09-13: agy (antigravity) 1.2.2 mac_arm64 is installed at ~/.local/bin/antigravity with an `agy` symlink; agy-acp is built from ~/.local/src/agy-acp and installed at ~/.local/bin/agy-acp. Verified end to end on that date: ACP initialize, session/new, and a full session/prompt turn that streamed an agent_message_chunk and closed with stopReason=end_turn. `env.PATH` above is load-bearing - agy-acp spawns the CLI as a bare Command::new(\"agy\") (adapter.rs:57,634) resolved from PATH, and the daemon's own PATH does not carry ~/.local/bin. The earlier concern that this machine's conversation store was the wrong format is RESOLVED and was a false alarm: ~/.gemini/antigravity/ is the Antigravity IDE (protobuf), a different product; the CLI created ~/.gemini/antigravity-cli/conversations/ (SQLite) on first run, which is exactly what agy-acp reads. Auth needed no owner action - the CLI inherited an existing Google sign-in on first invocation. No `models` array is declared on purpose - the ACP catalog is populated at runtime from `agy models`, and inventing ids here would put a guess where a live catalogue belongs.",
+        "command": [
+          "@HOME@/.local/bin/agy-acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
+          "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
+        },
+        "params": {
+          "supportsMcpServers": false,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 20
+      },
+      "gemini-lead": {
+        "extends": "acp",
+        "label": "Gemini Lead",
+        "description": "duckling-oci: same install as gemini-peer. UNGOVERNED SEAT - this name does not carry the authority it implies; the label said so until 2026-09-13, when the owner shortened it and the warning moved here. Owner-directed 2026-09-13. THIS IS NOT A LEAD IN THE SENSE THE OTHER LEAD ENTRY IS, and the label says so rather than letting the name imply it. A Lead's authority in this room comes from roles/lead.md injected via `claude --append-system-prompt` by the claude-profile launcher, plus role-gate.sh. Neither reaches an ACP seat (verified: zero systemPrompt references in acp-agent.js and generic-acp-agent.js). supportsMcpServers is left at its default TRUE because create_agent is the one capability a Lead cannot do without - which means this seat can spawn other seats while carrying no Lead law and no gate. That is the whole trade and it is recorded here, not hidden. There is no middle setting: turning MCP off to constrain it also removes create_agent and makes it a Peer. Built on Paseo's generic ACP branch (extends:'acp' -> GenericACPAgentClient). THREE PROPERTIES OF THAT BRANCH ARE LOAD-BEARING AND WERE VERIFIED IN THE SHIPPED SOURCE, not assumed: (1) the acp branch builds its client from {logger,command,env,providerId,label,providerParams} only, so `disallowedTools` on this entry would be silently DROPPED - it is deliberately absent here rather than present and inert; (2) the derived definition carries modes:[] and defaultModeId:null, so this seat has NO permission modes - plan-mode pinning is unavailable and the ACP agent's own prompt flow is the only gate; (3) neither acp-agent.js nor generic-acp-agent.js reads systemPrompt or appendSystemPrompt, so ~/.paseo/orchestration/roles/*.md CANNOT be injected into this seat by any Paseo mechanism. A seat here therefore carries no role law, no role-gate.sh (a Claude Code PreToolUse hook), and no ~/.claude/skills surface. PREREQUISITE, MET 2026-09-13: agy (antigravity) 1.2.2 mac_arm64 is installed at ~/.local/bin/antigravity with an `agy` symlink; agy-acp is built from ~/.local/src/agy-acp and installed at ~/.local/bin/agy-acp. Verified end to end on that date: ACP initialize, session/new, and a full session/prompt turn that streamed an agent_message_chunk and closed with stopReason=end_turn. `env.PATH` above is load-bearing - agy-acp spawns the CLI as a bare Command::new(\"agy\") (adapter.rs:57,634) resolved from PATH, and the daemon's own PATH does not carry ~/.local/bin. The earlier concern that this machine's conversation store was the wrong format is RESOLVED and was a false alarm: ~/.gemini/antigravity/ is the Antigravity IDE (protobuf), a different product; the CLI created ~/.gemini/antigravity-cli/conversations/ (SQLite) on first run, which is exactly what agy-acp reads. Auth needed no owner action - the CLI inherited an existing Google sign-in on first invocation. No `models` array is declared on purpose - the ACP catalog is populated at runtime from `agy models`, and inventing ids here would put a guess where a live catalogue belongs.",
+        "command": [
+          "@HOME@/.local/bin/agy-acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
+          "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 21
+      },
+      "gemini-supervisor": {
+        "extends": "acp",
+        "label": "Gemini Supervisor",
+        "description": "duckling-oci: same install as gemini-peer. UNGOVERNED SEAT - this name does not carry the authority it implies; the label said so until 2026-09-13, when the owner shortened it and the warning moved here. Owner-directed 2026-09-13. Same caveat as gemini-lead: roles/supervisor.md cannot be injected into an ACP seat, so this carries none of the Supervisor foundation contract - not the human-selection clause, not the no-standing-Lead clause, not the lease discipline. supportsMcpServers stays TRUE because Paseo lifecycle operation is the Supervisor's whole function. Note the resulting topology: this seat and gemini-lead are indistinguishable in capability; only the label differs. Built on Paseo's generic ACP branch (extends:'acp' -> GenericACPAgentClient). THREE PROPERTIES OF THAT BRANCH ARE LOAD-BEARING AND WERE VERIFIED IN THE SHIPPED SOURCE, not assumed: (1) the acp branch builds its client from {logger,command,env,providerId,label,providerParams} only, so `disallowedTools` on this entry would be silently DROPPED - it is deliberately absent here rather than present and inert; (2) the derived definition carries modes:[] and defaultModeId:null, so this seat has NO permission modes - plan-mode pinning is unavailable and the ACP agent's own prompt flow is the only gate; (3) neither acp-agent.js nor generic-acp-agent.js reads systemPrompt or appendSystemPrompt, so ~/.paseo/orchestration/roles/*.md CANNOT be injected into this seat by any Paseo mechanism. A seat here therefore carries no role law, no role-gate.sh (a Claude Code PreToolUse hook), and no ~/.claude/skills surface. PREREQUISITE, MET 2026-09-13: agy (antigravity) 1.2.2 mac_arm64 is installed at ~/.local/bin/antigravity with an `agy` symlink; agy-acp is built from ~/.local/src/agy-acp and installed at ~/.local/bin/agy-acp. Verified end to end on that date: ACP initialize, session/new, and a full session/prompt turn that streamed an agent_message_chunk and closed with stopReason=end_turn. `env.PATH` above is load-bearing - agy-acp spawns the CLI as a bare Command::new(\"agy\") (adapter.rs:57,634) resolved from PATH, and the daemon's own PATH does not carry ~/.local/bin. The earlier concern that this machine's conversation store was the wrong format is RESOLVED and was a false alarm: ~/.gemini/antigravity/ is the Antigravity IDE (protobuf), a different product; the CLI created ~/.gemini/antigravity-cli/conversations/ (SQLite) on first run, which is exactly what agy-acp reads. Auth needed no owner action - the CLI inherited an existing Google sign-in on first invocation. No `models` array is declared on purpose - the ACP catalog is populated at runtime from `agy models`, and inventing ids here would put a guess where a live catalogue belongs.",
+        "command": [
+          "@HOME@/.local/bin/agy-acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
+          "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 22
+      },
+      "watcher": {
+        "extends": "acp",
+        "label": "Watcher",
+        "description": "Read-only Watcher on Gemini, started and fed only by the Supervisor (roles/supervisor.md, Watcher section). Built on the agy-acp ACP bridge like gemini-peer, so roles/*.md cannot be injected by Paseo; instead AGY_EXTRA_ARGS adds @HOME@/.paseo/watcher to every agy run, and agy loads that directory's AGENTS.md (-> roles/watcher.md) as rules and its .agents/hooks.json as a PreToolUse gate (watcher/watcher-gate.sh). The gate, not the prompt, is the boundary: every tool is denied except run_command of paseo ls|logs|inspect, so the seat cannot read or write files, run other commands, or message seats. --dangerously-skip-permissions is required because a hook allow does not grant headless permission; the hook deny still wins (verified 2026-09-30). The directory must stay outside any git repository: agy walks from it to the repo root and would load that repo's AGENTS.md too (verified with the room checkout). No Paseo MCP (supportsMcpServers=false, and watcher is not in injectIntoProviders). Runs on both hosts; on duckling-oci agy is installed as described on gemini-peer.",
+        "command": [
+          "@HOME@/.local/bin/agy-acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "AGY_MODELS": "gemini-3.8-flash",
+          "AGY_EXTRA_ARGS": "--dangerously-skip-permissions --add-dir @HOME@/.paseo/watcher"
+        },
+        "params": {
+          "supportsMcpServers": false,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": false,
+              "writeTextFile": false
+            },
+            "terminal": false
+          }
+        },
+        "order": 23
       }
     }
   }
