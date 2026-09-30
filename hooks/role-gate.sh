@@ -11,8 +11,8 @@
 # Seat skill surface is narrow by construction: seats run in isolated
 # profile homes (~/.claude/profiles/claude-<role>) where no plugins are
 # installed and ~/.claude/profiles/settings.json disables them besides, so a seat sees
-# only project skills (trusty-bot/.claude/skills), user skills (the profile's
-# skills symlink -> ~/.claude/skills), and built-ins.
+# only project skills (<repo>/.claude/skills), room skills (the profile's
+# skills symlink -> <room>/skills), and built-ins.
 # A skill from a disabled plugin is unreachable regardless of these lists.
 set -euo pipefail
 
@@ -80,14 +80,14 @@ case "$GLOBAL_DENY" in
 esac
 
 # Lead: coordination, routing, acceptance. Never implements, never pre-solves,
-# never runs intake — it receives a scope already locked in the bd issue.
+# never runs intake — it receives a scope already locked by the owner.
 LEAD_ALLOW=" visual-explainer domain-modeling triage to-issues
  repo-refresh triple-review "
 
 # Peer: engineering inside one assigned scope. No coordination, no intake,
 # no harness configuration — those belong to Lead or Supervisor.
 PEER_ALLOW=" implement tdd prototype diagnosing-bugs simplify-code simplify
- codebase-design improve-codebase-architecture domain-modeling research beads
+ codebase-design improve-codebase-architecture domain-modeling research
  frontend-design pptx dataviz visual-explainer claude-api run security-review "
 
 # Supervisor: governance, observation, protocol optimization, Paseo operation.

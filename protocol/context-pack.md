@@ -9,7 +9,7 @@ sees the filled instance, never this file.
 
 ```text
 Project / workspace: <repository / project identity>
-Task: <case-slug or bd issue>
+Task: <case-slug or issue>
 Disposition: <Engineer | Architect | Reviewer | Scout | auditor | advisor>
 Authority source: <the Lead seat / issue that grants this lease>
 Workspace: <checkout or isolated worktree — required for concurrent writers>

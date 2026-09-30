@@ -69,8 +69,8 @@ edits, and always name the mutation boundary explicitly.
   pack when the session has compacted repeatedly or drifted. `logs` before
   you decide.
 - **Reconcile** after every 3–4 closed cases: re-check priorities against
-  dependency and leverage, absorb superseded issues (`bd` is the issue
-  source), archive idle sessions you own.
+  dependency and leverage, absorb superseded issues (the repo protocol names
+  the tracker, if any), archive idle sessions you own.
 
 ## Closing report — layered status
 

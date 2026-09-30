@@ -85,7 +85,7 @@ Writes re-enabled at:
 ```
 
 The receipt is the one durable record: the Supervisor appends it to
-`SUPERVISOR_NOTEBOOK.md` (or the project's bd issue when the repo
+`SUPERVISOR_NOTEBOOK.md` (or the project's issue tracker when the repo
 protocol names one). Everything else stays in session logs.
 
 ## Smells

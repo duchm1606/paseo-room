@@ -29,33 +29,14 @@
 
 ## Issue tracker
 
-Beads is the durable issue/work graph for this repository. It is not optional
-and it is not a status narrative — it is where work state lives between seats.
+Optional. Name the tracker this repository uses, or write `none`.
 
-- database: `.beads/` in the repository root
-- interface: the `bd` CLI. Beads Central MCP tools (`beads_status`, `beads_get`,
-  …) do not exist on this daemon; do not wait for them and do not pretend a
-  tracker call happened
-- project prefix:
+- tracker: <GitHub Issues | none>
+- who may create or close issues:
 
-Every role reads the tracker at three moments: when an assignment opens, when a
-dependency or blocker changes, and before any material handoff.
-
-- Lead: creates and updates issues; closes only after its own verdict
-- mutating Peer: claims and updates only the exact issue granted in the brief;
-  records new findings with `discoveredFrom`
-- read-only Peer: needs no grant to inspect
-- Supervisor: read-only
-
-Fail closed. If the tracker is unreachable, a mutating assignment is `BLOCKED`
-and issue state stays `UNKNOWN`. Never infer tracker state, never substitute
-another tracker or a Markdown task ledger, and never let a green check stand in
-for an issue that was never read.
-
-Known limit: a Codex seat running `sandbox_mode = "read-only"` cannot reach `bd`
-at all — the sandbox denies both the localhost connection to the Dolt server and
-the lock-file write that auto-start needs. Such a seat reports issue state
-`UNKNOWN` by construction; that is expected, not a failure to report.
+With `none`, the Lead's brief is the only record of scope, and the closing
+report is the only record of outcome. Never let a seat invent tracker state:
+an issue that was never read is `UNKNOWN`, not open or closed.
 
 ## Task classes
 
