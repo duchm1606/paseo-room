@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""Materialize an isolated CODEX_HOME for one room role.
+
+Reads the operator's ~/.codex/config.toml as the base, applies the role
+overlay ~/.codex/<role>.config.toml, and writes
+~/.codex-runtime/<role>/config.toml plus a patched model catalog. Shared
+operator resources (auth, AGENTS.md, skills, plugins, ...) are symlinked
+into the role runtime.
+
+Overlay format: top-level scalars before the first TOML table are role
+overrides; a developer_instructions triple-quoted block is the role prompt.
+Room directives (consumed here, never written to the merged config):
+  room_link_default_skills = false   -> do not link ~/.codex skills/plugins
+  room_instructions_from = "<role>"  -> inherit that overlay's instructions
+"""
+
+import json
+import os
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+ROLES = ("supervisor", "lead", "peer", "peer-zen")
+
+# Keys stripped from the base config head so the overlay value (or this
+# script's computed value) is the only definition in the merged config.
+OVERRIDE_KEYS = {
+    "model", "model_catalog_json", "model_reasoning_effort",
+    "model_reasoning_summary",
+    # 2026-09-12: these two were declared in ~/.codex/peer.config.toml from
+    # 2026-09-11 and SILENTLY DISCARDED for a day, because the merge below
+    # writes a hardcoded key list and anything absent from it never reaches
+    # the runtime config. An overlay key that is not carried here is not a
+    # setting, it is a comment.
+    "model_context_window", "model_auto_compact_token_limit",
+    "sandbox_mode", "approval_policy", "approvals_reviewer",
+    "developer_instructions",
+}
+
+# auth.json is optional: this install talks to a local CLIProxyAPI custom
+# provider via CLIPROXY_API_KEY, so no OpenAI login file needs to exist. The
+# rest are operator conveniences a headless host (duckling-oci) never created;
+# a seat runs without them.
+OPTIONAL_LINKS = {"auth.json", "AGENTS.md", "hooks.json", "skills", "plugins",
+                  "model-instructions.md"}
+
+
+def atomic_write(path: pathlib.Path, content: str) -> None:
+    fd, temporary = tempfile.mkstemp(prefix=f"{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            stream.write(content)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def top_level_table_offset(text: str) -> int:
+    match = re.search(r"(?m)^\[", text)
+    return match.start() if match else len(text)
+
+
+def overlay_scalars(text: str) -> dict[str, str]:
+    """Raw `key = value` pairs before the first table, comments excluded."""
+    values: dict[str, str] = {}
+    for line in text[:top_level_table_offset(text)].splitlines():
+        match = re.match(r"^([A-Za-z0-9_]+)\s*=\s*(.+)$", line)
+        if match:
+            values[match.group(1)] = match.group(2).strip()
+    return values
+
+
+def unquote(raw: str) -> str:
+    match = re.match(r'^"(.*)"$', raw)
+    if not match:
+        raise SystemExit(f"expected a quoted TOML string, got: {raw}")
+    return match.group(1)
+
+
+def overlay_instructions(text: str, source: pathlib.Path) -> str:
+    match = re.search(r'(?ms)^developer_instructions\s*=\s*"""\n(.*?)\n"""\s*$', text)
+    if not match:
+        raise SystemExit(f"no developer_instructions block in {source}")
+    return match.group(1)
+
+
+def set_table_flag(text: str, table: str, key: str) -> str:
+    header = rf"(?m)^\[{re.escape(table)}\]\s*$"
+    match = re.search(header, text)
+    if not match:
+        return text.rstrip() + f"\n\n[{table}]\n{key} = false\n"
+    next_table = re.search(r"(?m)^\[", text[match.end():])
+    end = match.end() + (next_table.start() if next_table else len(text[match.end():]))
+    section = text[match.end():end]
+    pattern = rf"(?m)^{re.escape(key)}\s*=.*$"
+    section = (re.sub(pattern, f"{key} = false", section, count=1)
+               if re.search(pattern, section)
+               else section.rstrip() + f"\n{key} = false\n\n")
+    return text[:match.end()] + section + text[end:]
+
+
+def safe_link(runtime: pathlib.Path, name: str, source: pathlib.Path) -> None:
+    if not source.exists():
+        if name in OPTIONAL_LINKS:
+            return
+        raise SystemExit(f"missing shared Codex resource: {source}")
+    target = runtime / name
+    if target.is_symlink() and target.resolve() == source.resolve():
+        return
+    if target.exists() or target.is_symlink():
+        if target.is_dir() and not target.is_symlink():
+            raise SystemExit(f"refusing to replace directory: {target}")
+        target.unlink()
+    target.symlink_to(source)
+
+
+def main() -> None:
+    if len(sys.argv) != 2 or sys.argv[1] not in ROLES:
+        raise SystemExit(f"usage: codex-room-sync <{'|'.join(ROLES)}>")
+    role = sys.argv[1]
+    home = pathlib.Path.home()
+    codex_home = home / ".codex"
+    runtime = home / ".codex-runtime" / role
+    runtime.mkdir(parents=True, exist_ok=True)
+    runtime.chmod(0o700)
+
+    overlay_path = codex_home / f"{role}.config.toml"
+    overlay = overlay_path.read_text()
+    scalars = overlay_scalars(overlay)
+    instructions_role = scalars.pop("room_instructions_from", None)
+    link_default_skills = scalars.pop("room_link_default_skills", "true") != "false"
+    if instructions_role is not None:
+        source = codex_home / f"{unquote(instructions_role)}.config.toml"
+        instructions = overlay_instructions(source.read_text(), source)
+    else:
+        instructions = overlay_instructions(overlay, overlay_path)
+
+    codex = shutil.which("codex")
+    if not codex:
+        raise SystemExit("codex binary not found")
+    try:
+        declared_window = int(str(scalars.get("model_context_window", "")).strip() or 0)
+    except ValueError:
+        declared_window = 0
+    catalog = json.loads(subprocess.run(
+        [codex, "debug", "models"], check=True, capture_output=True, text=True
+    ).stdout)
+    if not isinstance(catalog.get("models"), list) or not catalog["models"]:
+        raise SystemExit("active Codex model catalog is empty")
+    # Owner directive 2026-09-13: a model the Codex catalog does not carry
+    # still needs an entry here, or the declared window cannot reach it. Codex
+    # gives an unknown slug fallback metadata with max_context_window 272000,
+    # and with_config_overrides clamps model_context_window to that
+    # (codex-rs/models-manager/src/model_info.rs, rust-v0.146.1). Entries in
+    # ~/.codex/<role>.catalog-extra.json mirror that fallback field for field,
+    # so appending one changes the window and drops the per-turn fallback
+    # warning, and nothing else the model sees. A slug the catalog already
+    # carries wins over the mirror.
+    extra_path = codex_home / f"{role}.catalog-extra.json"
+    if extra_path.exists():
+        present = {model.get("slug") for model in catalog["models"]}
+        for model in json.loads(extra_path.read_text())["models"]:
+            if model["slug"] not in present:
+                catalog["models"].append(model)
+    for model in catalog["models"]:
+        # A non-null multi_agent_version makes raw `codex exec` hang under
+        # Paseo; the room never uses Codex-native agents.
+        model["multi_agent_version"] = None
+        # Owner rule 2026-08-10: thinking floor is high. When a turn selects
+        # a model without an explicit effort (paseo omits it unless a
+        # thinkingOptionId was set), Codex falls back to the catalog's
+        # default_reasoning_level — which is "low" for gpt-5.6-sol. Raise
+        # every sub-high default so the fallback can never land below high.
+        supported = {
+            level.get("effort")
+            for level in model.get("supported_reasoning_levels") or []
+        }
+        if "high" in supported and model.get("default_reasoning_level") in (
+            "minimal", "low", "medium",
+        ):
+            model["default_reasoning_level"] = "high"
+        # Owner directive 2026-09-12: raise the window. The seat's reported
+        # ceiling comes from HERE, not from model_context_window in the
+        # config -- measured: context_window 272000 * 95% =
+        # effective_context_window_percent gives exactly the 258,400 a live
+        # gpt-5.6-sol seat reported. 272000 is Codex's generic figure, not a
+        # per-model truth: every model in the catalog carries it, including
+        # gpt-5.4-mini. Driven by the role overlay rather than hardcoded, so
+        # a role that declares no window keeps Codex's default.
+        if declared_window:
+            model["context_window"] = declared_window
+            model["max_context_window"] = declared_window
+    catalog_path = runtime / "model-catalog.no-native-agents.json"
+    atomic_write(catalog_path, json.dumps(catalog, separators=(",", ":")) + "\n")
+
+    base = codex_home.joinpath("config.toml").read_text()
+    base = re.sub(
+        r'(?ms)^developer_instructions\s*=\s*""".*?^"""\s*$',
+        "",
+        base,
+        count=1,
+    )
+    offset = top_level_table_offset(base)
+    head, tail = base[:offset], base[offset:]
+    kept = []
+    for line in head.splitlines():
+        match = re.match(r"^([A-Za-z0-9_]+)\s*=", line)
+        if not match or match.group(1) not in OVERRIDE_KEYS:
+            kept.append(line)
+    head = "\n".join(kept).rstrip() + "\n"
+    head += f'model = {scalars["model"]}\n'
+    effort = scalars.get("model_reasoning_effort", '"medium"')
+    head += f'model_reasoning_effort = {effort}\n'
+    if "model_reasoning_summary" in scalars:
+        head += f'model_reasoning_summary = {scalars["model_reasoning_summary"]}\n'
+    for carried in ("model_context_window", "model_auto_compact_token_limit"):
+        if carried in scalars:
+            head += f'{carried} = {scalars[carried]}\n'
+    head += f'sandbox_mode = {scalars["sandbox_mode"]}\n'
+    head += f'approval_policy = {scalars["approval_policy"]}\n'
+    head += f'model_catalog_json = {json.dumps(str(catalog_path))}\n'
+    head += 'developer_instructions = """\n' + instructions + '\n"""\n\n'
+    merged = head + tail.lstrip()
+    merged = set_table_flag(merged, "agents", "enabled")
+    merged = set_table_flag(merged, "features", "multi_agent")
+    merged = set_table_flag(merged, "features", "multi_agent_v2")
+    atomic_write(runtime / "config.toml", merged)
+
+    links = ["auth.json", "AGENTS.md", "hooks.json", "skills", "plugins", "model-instructions.md"]
+    if not link_default_skills:
+        # No overlay sets this today: the OCR review seat, which was the
+        # only consumer, was deleted on 2026-09-12. The directive is kept
+        # because it is the overlay contract a specialized seat would use
+        # again — one whose developer instructions are the whole
+        # specialization and for which the shared skills are noise.
+        for name in ("skills", "plugins"):
+            links.remove(name)
+            stale = runtime / name
+            if stale.is_symlink():
+                stale.unlink()
+    for name in links:
+        safe_link(runtime, name, codex_home / name)
+
+    if role == "supervisor":
+        notebook = runtime / "SUPERVISOR_NOTEBOOK.md"
+        if not notebook.exists():
+            atomic_write(notebook, "# Supervisor Notebook\n\nRecord only durable causal evidence.\n")
+    # Codex app-server reserves stdout for its JSONL protocol; diagnostics
+    # stay on stderr.
+    print(runtime, file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

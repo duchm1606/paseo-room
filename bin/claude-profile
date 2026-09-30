@@ -10,9 +10,12 @@
 # or repo docs, not in a per-seat memory store nobody reviews.
 #
 # First launch seeds the profile:
-#   skills        -> ~/.claude/skills                (user skill surface; the
-#                                                     role-gate allow-lists
-#                                                     assume this exact set)
+#   skills        -> <room>/skills                   (the seat skill surface,
+#                                                     versioned with the
+#                                                     role-gate allow-lists;
+#                                                     the operator's own
+#                                                     ~/.claude/skills is not
+#                                                     visible to seats)
 #   .claude.json  -> minimal onboarding seed
 #   settings.json -> NOT seeded; see the auth block below.
 set -euo pipefail
@@ -39,7 +42,7 @@ link() { # link <name> <target>: seed a symlink, never clobber a real file
   ln -s "$target" "$path"
 }
 
-link skills "$HOME/.claude/skills"
+link skills "$ROOM/skills"
 
 if [ ! -e "$PROFILE_DIR/.claude.json" ]; then
   jq '{hasCompletedOnboarding: true, oauthAccount, autoUpdates: false}' \

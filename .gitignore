@@ -2,3 +2,4 @@
 telemetry/*.jsonl
 *.bak*
 attic/
+__pycache__/

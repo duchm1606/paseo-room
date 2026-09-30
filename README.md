@@ -1,70 +1,90 @@
 # Paseo room setup (`~/.paseo/orchestration`)
 
-This git checkout owns the room coordination layer: Claude seat launchers,
-hooks, role prompts, protocol doctrine, and the reference copy of the daemon
-wiring table. Tool configuration lives in each tool's own home, following
-the codex-room pattern (see `~/Downloads/Orchestration Collection/`
-codex-room-paseo-clean-install-guide.md).
+This git checkout owns the room coordination layer — Claude seat launchers,
+hooks, role prompts, protocol doctrine — plus the sources for what the room
+manages inside other tools' homes. `bin/room-install <host>` applies it to
+one machine; GitHub carries it between machines.
 
 ```text
-~/.paseo/
-├── config.json                daemon-owned wiring table: agents.providers
-│                              claude seats -> orchestration/bin/<launcher>
-│                              codex seats  -> ~/.local/bin/codex-room <role>
-├── orchestration/             THIS git checkout (master)
-│   ├── bin/                   claude-{lead,peer,supervisor}, claude-profile
-│   ├── roles/                 Claude role prompts (lead|peer|supervisor.md)
-│   ├── hooks/                 Claude seat hooks (role-gate, inject, telemetry)
-│   ├── protocol/              room doctrine (workspace protocol, handoff, ...)
-│   ├── paseo/config.json      reference copy of the wiring table
-│   ├── PHILOSOPHY.md TARGET.md SUPERVISOR_NOTEBOOK.md
-│   ├── telemetry/  attic/     operational data + old backups (gitignored)
-│   └── tests/smoke.sh
-└── agents/ projects/ ...      daemon state
+~/.paseo/orchestration/        THIS checkout (master), same path on every host
+├── bin/                       claude-{lead,peer,supervisor}, claude-profile,
+│                              claude-seat-token, room-install, room-sync
+├── roles/                     Claude role prompts (lead|peer|supervisor.md)
+├── hooks/                     Claude seat hooks (role-gate, inject, telemetry)
+├── protocol/                  room doctrine (workspace protocol, handoff, ...)
+├── skills/                    the seat skill set (seats see only these)
+├── hosts/<host>.json          provider table per host (mac, duckling-oci)
+├── claude/seat-settings.json  seat settings minus the token
+├── codex/                     codex-room, codex-room-sync, peer overlay
+├── PHILOSOPHY.md TARGET.md SUPERVISOR_NOTEBOOK.md
+├── telemetry/  attic/         operational data + old backups (gitignored)
+└── tests/smoke.sh
 
-~/.claude/                     Claude Code home (operator)
-├── profiles/settings.json     shared seat settings (hooks, plugin kill-switch)
-└── profiles/claude-<role>/    isolated seat homes (CLAUDE_CONFIG_DIR):
-                               settings.json + skills seeded as symlinks,
-                               .claude.json/.credentials.json seeded on launch
-
-~/.codex/                      Codex home (operator base, shared by all roles)
-├── config.toml                base config
-├── <role>.config.toml         role overlays: supervisor|lead|peer|peer-zen|review
-└── auth/skills/plugins/...    symlinked into each role runtime
-
-~/.codex-runtime/<role>/       generated CODEX_HOMEs (regenerated per launch)
-
-~/.local/bin/                  codex-room, codex-room-sync (real scripts,
-                               per the codex-room install guide)
+Installed by room-install (symlink or rendered copy):
+~/.paseo/config.json           pluginsEnabled, plugins, agents.providers
+                               <- hosts/<host>.json with @HOME@ expanded
+~/.claude/profiles/settings.json            seat template   } managed keys from
+~/.claude/profiles/claude-<role>/settings.json  per seat    } claude/, token kept
+~/.claude/profiles/claude-<role>/skills  -> skills/
+~/.local/bin/codex-room{,-sync}          -> codex/bin/
+~/.codex/peer.{config.toml,catalog-extra.json} -> codex/
 ```
+
+Host-local and never synced: `~/.codex/config.toml` (Codex base, provider
+endpoints), other `~/.codex/<role>.config.toml` overlays, the operator's own
+`~/.claude/skills`, daemon keys in `~/.paseo/config.json` (listen, hostnames,
+relay, ...), and every secret.
+
+## Sync between hosts
+
+```bash
+# on the machine where you changed something
+cd ~/.paseo/orchestration && tests/smoke.sh && git commit -am '...' && git push
+
+# on every other host
+~/.paseo/orchestration/bin/room-sync     # pull --ff-only + room-install
+```
+
+Then restart the daemon when no seat is mid-task (a restart kills running
+agents): the Paseo desktop app on macOS, `sudo systemctl restart
+paseo-daemon` on duckling-oci.
+
+## First install on a new host
+
+```bash
+git clone https://github.com/duchm1606/paseo-room.git ~/.paseo/orchestration
+~/.paseo/orchestration/bin/room-install <host>      # hosts/<host>.json
+```
+
+Prerequisites: `jq`, `claude`, and — when the host has a `codex-peer`
+provider — `codex`, `python3` and a running CLIProxyAPI whose key is in
+`CLIPROXY_API_KEY` or the proxy config. The daemon must have started once so
+`~/.paseo/config.json` exists. A seat without a token is seeded from the seat
+template, else from the operator's `~/.claude/settings.json`; otherwise mint
+one with `claude setup-token` and set it with `claude-seat-token`.
 
 ## Claude seats
 
 `claude-profile <role>` (wrapped by `claude-lead|peer|supervisor`) runs each
 seat in an isolated profile home `~/.claude/profiles/claude-<role>` via
-`CLAUDE_CONFIG_DIR` — the documented mechanism for multiple profiles
-(code.claude.com/docs/en/settings). Seat env: `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`
-(durable findings belong in handbacks or repo docs, not per-seat auto-memory)
-and `ROOM_ROLE=<role>` (consumed by the hooks). First launch seeds the
-profile: settings.json -> `~/.claude/profiles/settings.json`, skills ->
-`~/.claude/skills`, `.credentials.json` from the shared macOS Keychain entry,
-and a trust record for the launch directory. The role prompt `roles/<role>.md`
-ships via `--append-system-prompt` and is re-injected on SessionStart by
+`CLAUDE_CONFIG_DIR`. Seat env: `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` (durable
+findings belong in handbacks or repo docs, not per-seat auto-memory) and
+`ROOM_ROLE=<role>` (consumed by the hooks). Each seat authenticates with its
+own `CLAUDE_CODE_OAUTH_TOKEN` in its own `settings.json`; the launcher refuses
+to start without one. The role prompt `roles/<role>.md` ships via
+`--append-system-prompt` and is re-injected on SessionStart by
 `hooks/inject-profile.sh` (stream-json mode drops the flag).
 
-If a seat reports "Not logged in": delete that profile's `.credentials.json`
-and relaunch to re-seed, or run `/login` inside the profile.
+Seats see only `skills/` plus Claude Code built-ins and repo project skills;
+`hooks/role-gate.sh` then narrows that to a per-role allow-list.
 
 ## Codex seats
 
 `codex-room <role>` regenerates `~/.codex-runtime/<role>/` on every launch:
 base `~/.codex/config.toml` + overlay `~/.codex/<role>.config.toml` ->
 merged `config.toml`, plus a model catalog patched to disable Codex-native
-agents and floor reasoning at high. Roles: `supervisor` (watcher), `lead`
-(unwired spare), `peer`, `peer-zen` (Zen-direct Luna transport), `review`
-(OCR lane, no default skills). Overlay room-directives:
-`room_instructions_from` (prompt inheritance), `room_link_default_skills = false`.
+agents and floor reasoning at high. Only `peer` is wired to a provider
+(`codex-peer`); its overlay is versioned here.
 
 Never edit a generated `config.toml` — change the base or the overlay and
 relaunch (or run `codex-room-sync <role>`).

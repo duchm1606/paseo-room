@@ -1,0 +1,359 @@
+{
+  "pluginsEnabled": false,
+  "plugins": {},
+  "agents": {
+    "providers": {
+      "claude": {
+        "label": "Claude",
+        "description": "Base seat. Same delegation law as the role seats: Paseo seats are the only delegation surface, no in-session subagents.",
+        "disallowedTools": [
+          "Task",
+          "Agent",
+          "Workflow"
+        ]
+      },
+      "opencode": {
+        "enabled": false
+      },
+      "supervisor": {
+        "extends": "claude",
+        "label": "Supervisor-of-record",
+        "description": "Governance front door, process memory, Paseo lifecycle",
+        "command": [
+          "@HOME@/.paseo/orchestration/bin/claude-supervisor"
+        ],
+        "env": {
+          "ROOM_ROLE": "supervisor"
+        },
+        "models": [
+          {
+            "id": "claude-opus-5-5",
+            "label": "Opus 5.5 (1M)"
+          },
+          {
+            "id": "claude-opus-5",
+            "label": "Opus 5 (1M)",
+            "isDefault": true
+          },
+          {
+            "id": "claude-opus-4-8[1m]",
+            "label": "Opus 4.8 (1M)"
+          },
+          {
+            "id": "claude-fable-5[1m]",
+            "label": "Fable 5 (1M)"
+          },
+          {
+            "id": "claude-fable-5",
+            "label": "Fable 5 (200K)"
+          },
+          {
+            "id": "claude-sonnet-5",
+            "label": "Sonnet 5 (momentum/ops)"
+          }
+        ],
+        "disallowedTools": [
+          "Task",
+          "Agent",
+          "Workflow"
+        ],
+        "order": 1
+      },
+      "lead": {
+        "extends": "claude",
+        "label": "Lead-of-record",
+        "description": "Router and binding arbiter — planning, coordination, acceptance",
+        "command": [
+          "@HOME@/.paseo/orchestration/bin/claude-lead"
+        ],
+        "env": {
+          "ROOM_ROLE": "lead"
+        },
+        "models": [
+          {
+            "id": "claude-opus-5-5",
+            "label": "Opus 5.5 (1M)"
+          },
+          {
+            "id": "claude-opus-5",
+            "label": "Opus 5 (1M)",
+            "isDefault": true
+          },
+          {
+            "id": "claude-opus-4-8[1m]",
+            "label": "Opus 4.8 (1M)"
+          }
+        ],
+        "disallowedTools": [
+          "Task",
+          "Agent",
+          "Workflow"
+        ],
+        "order": 2
+      },
+      "peer": {
+        "extends": "claude",
+        "label": "Peer",
+        "description": "Independent engineering peer; disposition (Engineer/Architect/Reviewer/Scout) set per task brief. Owner directive 2026-09-12: fast mode stays OFF on this seat too. Here it means the Claude toggle - a different feature from the Codex one on codex-peer, same id, and it was already off on every peer seat. Paseo exposes no provider key that hides it: the Claude provider surfaces it for any model whose manifest carries supportsFastMode, which is every Opus entry below. Dropping the Opus models is the only way to make the toggle disappear and the owner declined that, so the peer keeps Opus and this line is the record.",
+        "command": [
+          "@HOME@/.paseo/orchestration/bin/claude-peer"
+        ],
+        "models": [
+          {
+            "id": "claude-opus-5-5",
+            "label": "Opus 5.5 (1M)",
+            "isDefault": true
+          },
+          {
+            "id": "claude-fable-5-1",
+            "label": "Fable 5.1"
+          },
+          {
+            "id": "claude-fable-5[1m]",
+            "label": "Fable 5"
+          },
+          {
+            "id": "claude-opus-5",
+            "label": "Opus 5 (1M)"
+          },
+          {
+            "id": "claude-opus-4-8[1m]",
+            "label": "Opus 4.8 (1M)"
+          },
+          {
+            "id": "claude-sonnet-5",
+            "label": "Sonnet 5"
+          }
+        ],
+        "disallowedTools": [
+          "Task",
+          "Agent",
+          "Workflow",
+          "mcp__paseo"
+        ]
+      },
+      "codex-peer": {
+        "extends": "codex",
+        "label": "Codex Peer",
+        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools. Four models: deepseek-v4.1-flash (the default), gpt-6-sol, gpt-5.6-sol and gpt-5.6-luna. Which role a model plays is set per workspace by that workspace's WORKSPACE_PROTOCOL.md, not here. deepseek-v4.1-flash is the declared default in BOTH this table and ~/.codex/peer.config.toml, so the model a seat resolves to and the model its record names are the same value; keep those two in step. NO OCR COVERAGE LANE (owner directive 2026-09-14): the OCR block was removed from ~/.codex/peer.config.toml and ~/.opencodereview is no longer a writable root, so a gpt-5.6-luna seat is an ordinary Peer; its thinkingOptions still offer only max. PEER DEFAULTS (owner directive 2026-09-14, from the reference Peer config): effort medium, sandbox danger-full-access, approval never. deepseek-v4.1-flash offers two thinking options, high (the default) and none, and CLIProxyAPI clamps medium to high for it; gpt-5.6-sol offers medium (the default, matching the overlay), low, high, xhigh and max; ultra is left out because it delegates tasks automatically. gpt-6-sol (added 2026-09-29) offers the same five levels; CLIProxyAPI rejects ultra for it outright. It is off the Codex catalog, so its entry lives in ~/.codex/model-catalog.1m.json and ~/.codex/peer.catalog-extra.json (cloned from gpt-5.6-sol). FAST MODE STAYS OFF (owner directive 2026-09-12): Codex fast_mode is 'Priority inference at 2x usage' and was found ON for gpt-5.6-sol on three live seats. It defaults to off, so each was turned on deliberately at spawn - do not pass featureValues.fast_mode to create_agent here.",
+        "command": [
+          "@HOME@/.local/bin/codex-room",
+          "peer"
+        ],
+        "models": [
+          {
+            "id": "deepseek-v4.1-flash",
+            "label": "DeepSeek V4.1 Flash",
+            "isDefault": true,
+            "thinkingOptions": [
+              {
+                "id": "high",
+                "label": "High",
+                "isDefault": true
+              },
+              {
+                "id": "none",
+                "label": "None"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6-sol",
+            "label": "GPT-6 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "gpt-5.6-sol",
+            "label": "GPT-5.6 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "gpt-5.6-luna",
+            "label": "GPT-5.6 Luna",
+            "thinkingOptions": [
+              {
+                "id": "max",
+                "label": "Max",
+                "isDefault": true
+              }
+            ]
+          }
+        ],
+        "disallowedTools": [
+          "Task",
+          "Agent",
+          "Workflow",
+          "mcp__paseo"
+        ]
+      },
+      "gemini-peer": {
+        "extends": "acp",
+        "label": "Gemini Peer",
+        "description": "Bounded engineering/scout collaborator on Gemini via the agy-acp ACP bridge. Mirrors codex-peer's shape: no Paseo tools. Enforced by params.supportsMcpServers=false, which is the ONLY lever that works here - `disallowedTools:['mcp__paseo']`, the mechanism used on peer and codex-peer, does not reach an ACP client. MCP is therefore all-or-nothing on this seat, and it is off. Built on Paseo's generic ACP branch (extends:'acp' -> GenericACPAgentClient). THREE PROPERTIES OF THAT BRANCH ARE LOAD-BEARING AND WERE VERIFIED IN THE SHIPPED SOURCE, not assumed: (1) the acp branch builds its client from {logger,command,env,providerId,label,providerParams} only, so `disallowedTools` on this entry would be silently DROPPED - it is deliberately absent here rather than present and inert; (2) the derived definition carries modes:[] and defaultModeId:null, so this seat has NO permission modes - plan-mode pinning is unavailable and the ACP agent's own prompt flow is the only gate; (3) neither acp-agent.js nor generic-acp-agent.js reads systemPrompt or appendSystemPrompt, so ~/.paseo/orchestration/roles/*.md CANNOT be injected into this seat by any Paseo mechanism. A seat here therefore carries no role law, no role-gate.sh (a Claude Code PreToolUse hook), and no ~/.claude/skills surface. PREREQUISITE, MET 2026-09-13: agy (antigravity) 1.2.2 mac_arm64 is installed at ~/.local/bin/antigravity with an `agy` symlink; agy-acp is built from ~/.local/src/agy-acp and installed at ~/.local/bin/agy-acp. Verified end to end on that date: ACP initialize, session/new, and a full session/prompt turn that streamed an agent_message_chunk and closed with stopReason=end_turn. `env.PATH` above is load-bearing - agy-acp spawns the CLI as a bare Command::new(\"agy\") (adapter.rs:57,634) resolved from PATH, and the daemon's own PATH does not carry ~/.local/bin. The earlier concern that this machine's conversation store was the wrong format is RESOLVED and was a false alarm: ~/.gemini/antigravity/ is the Antigravity IDE (protobuf), a different product; the CLI created ~/.gemini/antigravity-cli/conversations/ (SQLite) on first run, which is exactly what agy-acp reads. Auth needed no owner action - the CLI inherited an existing Google sign-in on first invocation. No `models` array is declared on purpose - the ACP catalog is populated at runtime from `agy models`, and inventing ids here would put a guess where a live catalogue belongs.",
+        "command": [
+          "@HOME@/.local/bin/agy-acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
+          "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
+        },
+        "params": {
+          "supportsMcpServers": false,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 20
+      },
+      "gemini-lead": {
+        "extends": "acp",
+        "label": "Gemini Lead",
+        "description": "UNGOVERNED SEAT - this name does not carry the authority it implies; the label said so until 2026-09-13, when the owner shortened it and the warning moved here. Owner-directed 2026-09-13. THIS IS NOT A LEAD IN THE SENSE THE OTHER LEAD ENTRY IS, and the label says so rather than letting the name imply it. A Lead's authority in this room comes from roles/lead.md injected via `claude --append-system-prompt` by the claude-profile launcher, plus role-gate.sh. Neither reaches an ACP seat (verified: zero systemPrompt references in acp-agent.js and generic-acp-agent.js). supportsMcpServers is left at its default TRUE because create_agent is the one capability a Lead cannot do without - which means this seat can spawn other seats while carrying no Lead law and no gate. That is the whole trade and it is recorded here, not hidden. There is no middle setting: turning MCP off to constrain it also removes create_agent and makes it a Peer. Built on Paseo's generic ACP branch (extends:'acp' -> GenericACPAgentClient). THREE PROPERTIES OF THAT BRANCH ARE LOAD-BEARING AND WERE VERIFIED IN THE SHIPPED SOURCE, not assumed: (1) the acp branch builds its client from {logger,command,env,providerId,label,providerParams} only, so `disallowedTools` on this entry would be silently DROPPED - it is deliberately absent here rather than present and inert; (2) the derived definition carries modes:[] and defaultModeId:null, so this seat has NO permission modes - plan-mode pinning is unavailable and the ACP agent's own prompt flow is the only gate; (3) neither acp-agent.js nor generic-acp-agent.js reads systemPrompt or appendSystemPrompt, so ~/.paseo/orchestration/roles/*.md CANNOT be injected into this seat by any Paseo mechanism. A seat here therefore carries no role law, no role-gate.sh (a Claude Code PreToolUse hook), and no ~/.claude/skills surface. PREREQUISITE, MET 2026-09-13: agy (antigravity) 1.2.2 mac_arm64 is installed at ~/.local/bin/antigravity with an `agy` symlink; agy-acp is built from ~/.local/src/agy-acp and installed at ~/.local/bin/agy-acp. Verified end to end on that date: ACP initialize, session/new, and a full session/prompt turn that streamed an agent_message_chunk and closed with stopReason=end_turn. `env.PATH` above is load-bearing - agy-acp spawns the CLI as a bare Command::new(\"agy\") (adapter.rs:57,634) resolved from PATH, and the daemon's own PATH does not carry ~/.local/bin. The earlier concern that this machine's conversation store was the wrong format is RESOLVED and was a false alarm: ~/.gemini/antigravity/ is the Antigravity IDE (protobuf), a different product; the CLI created ~/.gemini/antigravity-cli/conversations/ (SQLite) on first run, which is exactly what agy-acp reads. Auth needed no owner action - the CLI inherited an existing Google sign-in on first invocation. No `models` array is declared on purpose - the ACP catalog is populated at runtime from `agy models`, and inventing ids here would put a guess where a live catalogue belongs.",
+        "command": [
+          "@HOME@/.local/bin/agy-acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
+          "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 21
+      },
+      "gemini-supervisor": {
+        "extends": "acp",
+        "label": "Gemini Supervisor",
+        "description": "UNGOVERNED SEAT - this name does not carry the authority it implies; the label said so until 2026-09-13, when the owner shortened it and the warning moved here. Owner-directed 2026-09-13. Same caveat as gemini-lead: roles/supervisor.md cannot be injected into an ACP seat, so this carries none of the Supervisor foundation contract - not the human-selection clause, not the no-standing-Lead clause, not the lease discipline. supportsMcpServers stays TRUE because Paseo lifecycle operation is the Supervisor's whole function. Note the resulting topology: this seat and gemini-lead are indistinguishable in capability; only the label differs. Built on Paseo's generic ACP branch (extends:'acp' -> GenericACPAgentClient). THREE PROPERTIES OF THAT BRANCH ARE LOAD-BEARING AND WERE VERIFIED IN THE SHIPPED SOURCE, not assumed: (1) the acp branch builds its client from {logger,command,env,providerId,label,providerParams} only, so `disallowedTools` on this entry would be silently DROPPED - it is deliberately absent here rather than present and inert; (2) the derived definition carries modes:[] and defaultModeId:null, so this seat has NO permission modes - plan-mode pinning is unavailable and the ACP agent's own prompt flow is the only gate; (3) neither acp-agent.js nor generic-acp-agent.js reads systemPrompt or appendSystemPrompt, so ~/.paseo/orchestration/roles/*.md CANNOT be injected into this seat by any Paseo mechanism. A seat here therefore carries no role law, no role-gate.sh (a Claude Code PreToolUse hook), and no ~/.claude/skills surface. PREREQUISITE, MET 2026-09-13: agy (antigravity) 1.2.2 mac_arm64 is installed at ~/.local/bin/antigravity with an `agy` symlink; agy-acp is built from ~/.local/src/agy-acp and installed at ~/.local/bin/agy-acp. Verified end to end on that date: ACP initialize, session/new, and a full session/prompt turn that streamed an agent_message_chunk and closed with stopReason=end_turn. `env.PATH` above is load-bearing - agy-acp spawns the CLI as a bare Command::new(\"agy\") (adapter.rs:57,634) resolved from PATH, and the daemon's own PATH does not carry ~/.local/bin. The earlier concern that this machine's conversation store was the wrong format is RESOLVED and was a false alarm: ~/.gemini/antigravity/ is the Antigravity IDE (protobuf), a different product; the CLI created ~/.gemini/antigravity-cli/conversations/ (SQLite) on first run, which is exactly what agy-acp reads. Auth needed no owner action - the CLI inherited an existing Google sign-in on first invocation. No `models` array is declared on purpose - the ACP catalog is populated at runtime from `agy models`, and inventing ids here would put a guess where a live catalogue belongs.",
+        "command": [
+          "@HOME@/.local/bin/agy-acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
+          "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 22
+      },
+      "pi": {
+        "enabled": false
+      },
+      "copilot": {
+        "enabled": false
+      },
+      "codex": {
+        "additionalModels": [
+          {
+            "id": "deepseek-v4.1-flash",
+            "label": "DeepSeek V4.1 Flash",
+            "thinkingOptions": [
+              {
+                "id": "high",
+                "label": "High",
+                "isDefault": true
+              },
+              {
+                "id": "none",
+                "label": "None"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6-sol",
+            "label": "GPT-6 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

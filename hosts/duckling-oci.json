@@ -1,33 +1,6 @@
 {
-  "version": 1,
-  "daemon": {
-    "listen": "127.0.0.1:6767",
-    "mcp": {
-      "injectIntoAgents": true,
-      "injectIntoProviders": [
-        "lead",
-        "supervisor"
-      ]
-    },
-    "browserTools": {
-      "enabled": false
-    },
-    "autoArchiveAfterMerge": false,
-    "enableTerminalAgentHooks": true,
-    "appendSystemPrompt": "",
-    "cors": {
-      "allowedOrigins": [
-        "https://app.paseo.sh"
-      ]
-    },
-    "relay": {
-      "enabled": true
-    }
-  },
-  "app": {
-    "baseUrl": "https://app.paseo.sh"
-  },
   "pluginsEnabled": false,
+  "plugins": {},
   "agents": {
     "providers": {
       "claude": {
@@ -47,12 +20,16 @@
         "label": "Supervisor-of-record",
         "description": "Governance front door, process memory, Paseo lifecycle",
         "command": [
-          "/Users/duchoang/.paseo/orchestration/bin/claude-supervisor"
+          "@HOME@/.paseo/orchestration/bin/claude-supervisor"
         ],
         "env": {
           "ROOM_ROLE": "supervisor"
         },
         "models": [
+          {
+            "id": "claude-opus-5-5",
+            "label": "Opus 5.5 (1M)"
+          },
           {
             "id": "claude-opus-5",
             "label": "Opus 5 (1M)",
@@ -85,14 +62,18 @@
       "lead": {
         "extends": "claude",
         "label": "Lead-of-record",
-        "description": "Router and binding arbiter \u2014 planning, coordination, acceptance",
+        "description": "Router and binding arbiter — planning, coordination, acceptance",
         "command": [
-          "/Users/duchoang/.paseo/orchestration/bin/claude-lead"
+          "@HOME@/.paseo/orchestration/bin/claude-lead"
         ],
         "env": {
           "ROOM_ROLE": "lead"
         },
         "models": [
+          {
+            "id": "claude-opus-5-5",
+            "label": "Opus 5.5 (1M)"
+          },
           {
             "id": "claude-opus-5",
             "label": "Opus 5 (1M)",
@@ -115,9 +96,14 @@
         "label": "Peer",
         "description": "Independent engineering peer; disposition (Engineer/Architect/Reviewer/Scout) set per task brief. Owner directive 2026-09-12: fast mode stays OFF on this seat too. Here it means the Claude toggle - a different feature from the Codex one on codex-peer, same id, and it was already off on every peer seat. Paseo exposes no provider key that hides it: the Claude provider surfaces it for any model whose manifest carries supportsFastMode, which is every Opus entry below. Dropping the Opus models is the only way to make the toggle disappear and the owner declined that, so the peer keeps Opus and this line is the record.",
         "command": [
-          "/Users/duchoang/.paseo/orchestration/bin/claude-peer"
+          "@HOME@/.paseo/orchestration/bin/claude-peer"
         ],
         "models": [
+          {
+            "id": "claude-opus-5-5",
+            "label": "Opus 5.5 (1M)",
+            "isDefault": true
+          },
           {
             "id": "claude-fable-5-1",
             "label": "Fable 5.1"
@@ -128,8 +114,7 @@
           },
           {
             "id": "claude-opus-5",
-            "label": "Opus 5 (1M)",
-            "isDefault": true
+            "label": "Opus 5 (1M)"
           },
           {
             "id": "claude-opus-4-8[1m]",
@@ -150,29 +135,25 @@
       "codex-peer": {
         "extends": "codex",
         "label": "Codex Peer",
-        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools. Owner directive 2026-09-12 (second revision): three models - deepseek-v4.1-flash for ordinary engineering and the default, gpt-5.6-sol for heavy work, gpt-5.6-luna for the OCR coverage lane. This supersedes the one-model rule recorded here earlier the same day. That rule stopped a bare `codex-peer` resolving to a DeepSeek default while records read as Sol; the defect is closed differently now - deepseek-v4.1-flash is the declared default in BOTH this table and ~/.codex/peer.config.toml, so the model a seat resolves to and the model its record names are the same value. Keep those two in step. LUNA CARRIES THE OCR LANE: the deleted codex-review provider was the only thing implementing the `executionProfile=review` route the triple-review skill asks for - that string exists nowhere in Paseo, so the skill's coverage lane had no implementation once the provider went. The specialization now lives in ~/.codex/peer.config.toml, gated on gpt-5.6-luna, and ~/.opencodereview is a writable root in ~/.codex/config.toml so preview can persist its session without the danger-full-access the old lane used. Luna's max-thinking rule is enforced by the thinkingOptions below; it previously lived only in the deleted review overlay. FAST MODE STAYS OFF (owner directive 2026-09-12): Codex fast_mode is 'Priority inference at 2x usage' and was found ON for gpt-5.6-sol on three live seats. It defaults to off, so each was turned on deliberately at spawn - do not pass featureValues.fast_mode to create_agent here.",
+        "description": "Bounded engineering collaborator on CLIProxy-routed DeepSeek; no Paseo tools. duckling-oci runs CLIProxyAPI with OpenCodeGo/deepseek-v4.1-flash only, so this is the one model. codex-room reads CLIPROXY_API_KEY from the daemon environment (systemd EnvironmentFile ~/.config/cliproxy.env). deepseek-v4.1-flash is the declared default in BOTH this table and ~/.codex/peer.config.toml; keep those two in step. Fast mode stays off: do not pass featureValues.fast_mode to create_agent here.",
         "command": [
-          "/Users/duchoang/.local/bin/codex-room",
+          "@HOME@/.local/bin/codex-room",
           "peer"
         ],
         "models": [
           {
             "id": "deepseek-v4.1-flash",
             "label": "DeepSeek V4.1 Flash",
-            "isDefault": true
-          },
-          {
-            "id": "gpt-5.6-sol",
-            "label": "GPT-5.6 Sol"
-          },
-          {
-            "id": "gpt-5.6-luna",
-            "label": "GPT-5.6 Luna",
+            "isDefault": true,
             "thinkingOptions": [
               {
-                "id": "max",
-                "label": "Max",
+                "id": "high",
+                "label": "High",
                 "isDefault": true
+              },
+              {
+                "id": "none",
+                "label": "None"
               }
             ]
           }
@@ -183,15 +164,32 @@
           "Workflow",
           "mcp__paseo"
         ]
+      },
+      "pi": {
+        "enabled": false
+      },
+      "copilot": {
+        "enabled": false
+      },
+      "codex": {
+        "additionalModels": [
+          {
+            "id": "deepseek-v4.1-flash",
+            "label": "DeepSeek V4.1 Flash",
+            "thinkingOptions": [
+              {
+                "id": "high",
+                "label": "High",
+                "isDefault": true
+              },
+              {
+                "id": "none",
+                "label": "None"
+              }
+            ]
+          }
+        ]
       }
-    }
-  },
-  "features": {
-    "dictation": {
-      "enabled": false
-    },
-    "voiceMode": {
-      "enabled": false
     }
   }
 }

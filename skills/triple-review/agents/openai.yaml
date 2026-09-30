@@ -1,0 +1,4 @@
+interface:
+  display_name: "Triple Review"
+  short_description: "Run sealed semantic and coverage review lanes on protocol-pinned routes"
+  default_prompt: "Use $triple-review to review one stable candidate through two semantic seats and one coverage seat, on the routes the workspace protocol pins."

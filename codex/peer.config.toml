@@ -1,0 +1,128 @@
+# Codex Peer — Paseo provider "codex-peer" (CLIProxyAPI transport).
+# Owner directive 2026-09-14: default effort medium, sandbox danger-full-access
+# and approval never, taken from the reference Peer config
+# (~/Downloads/Orchestration Collection, PMmodel-gpt-56-.txt). This supersedes
+# the 2026-08-10 rule that peer seats never run below high. The model stays
+# deepseek-v4.1-flash, not the reference's gpt-5.6-sol.
+# - deepseek-v4.1-flash: Paseo offers high (default) and none, and CLIProxyAPI
+#   declares only none/high for it and clamps medium to high (measured
+#   2026-09-14), so a DeepSeek seat opened without a thinking option still
+#   sends high upstream.
+# - gpt-5.6-sol: Paseo offers medium (default, matching this file), low, high,
+#   xhigh and max, so its effort is chosen per seat. ultra is left out: it
+#   delegates tasks automatically.
+# - [features] multi_agent is not repeated here: codex-room-sync forces it off
+#   in every runtime, and a table in an overlay is discarded anyway.
+# Owner directive 2026-08-10: model_reasoning_summary = "none" suppresses
+# reasoning narration (measured cost: ~21.7k of 30.8k output tokens in one
+# DeepSeek session were agent_reasoning text).
+
+# Owner directive 2026-09-11: Codex has no entry for the models on this
+# provider, so it fell back to a generic 258,400-token window for ALL of them
+# (measured identical for deepseek-v4.1-flash, gpt-5.6-sol, gpt-5.6-terra and
+# gpt-6-astra). That is not any model's real limit. A deepseek-v4.1-flash peer
+# died at that ceiling mid-task rather than compacting.
+#
+# The pair below is deliberate: the window removes the false ceiling, and the
+# compact limit — not the window — is what actually bounds a peer. A peer does
+# bounded work and needs to survive, not to hold a huge context. Compacting at
+# 256k also keeps us clear of any lower cut the proxy or plan may impose
+# between here and the model, which is unverified (CLIProxy /v1/models returns
+# 401 locally). Raise the compact limit only with evidence of the real ceiling.
+#
+# Owner directive 2026-09-12, two changes, both made knowing the line above.
+#   1. model = "gpt-5.6-sol". Peers run Sol and nothing else now; Terra was the
+#      previous default here.
+#   2. model_auto_compact_token_limit 262144 -> 307200 (300 * 1024), asked for
+#      as "auto compact 300k token".
+# The second OVERRIDES the caution directly above it: we still have no evidence
+# of the real ceiling, because CLIProxy /v1/models still returns 401 locally.
+# The caution is left in place rather than deleted, because it states the exact
+# failure to watch for - if anything between here and the model cuts below
+# 300k, a peer dies AT that cut instead of compacting, which is how a
+# deepseek-v4.1-flash peer was lost at 258,400. If a Sol peer dies mid-task
+# without compacting, this pair is the first thing to suspect and 262144 is the
+# known-survivable value to fall back to.
+#
+# 2026-09-12, ONE HOUR LATER — MEASURED, AND IT REVERSES THE ABOVE.
+# A gpt-5.6-sol seat created minutes ago reports contextWindowMaxTokens =
+# 258400, and was observed at 185,682 of it. So 258,400 is NOT stale and NOT
+# merely a display artefact: it is the ceiling a live Sol seat operates
+# against, regardless of model_context_window above.
+#
+# That makes BOTH previous compact limits unreachable. 307200 > 258400, and so
+# was 262144. A limit above the ceiling means auto-compaction CAN NEVER FIRE -
+# the seat dies at the cut instead, which is precisely the DeepSeek death this
+# file already recorded and neither value could have prevented. "262144 is
+# known-survivable" was wrong; it was never tested against the real ceiling
+# because nothing ever reached it.
+#
+# 196608 (192 * 1024) is 76% of the observed ceiling, leaving ~61k of headroom
+# for the compaction request itself to fit underneath. The asymmetry decides
+# the value: compacting earlier than strictly necessary costs a little speed,
+# while not compacting at all costs the whole task. If the true window is later
+# shown to be larger, raise this - but raise it against a MEASURED ceiling, not
+# against model_context_window, which is a declaration and has now been shown
+# not to govern.
+#
+# 2026-09-12, LATER THE SAME DAY - MEASURED AGAIN, AND THE 258,400 READING
+# ABOVE IS SUPERSEDED. A gpt-5.6-sol codex-peer seat running at 13:39 reports
+# contextWindowMaxTokens = 996147, which is 1048576 * 0.95 to the token. The
+# declared window DOES govern, through the catalog codex-room-sync patches:
+# every model in ~/.codex-runtime/peer/model-catalog.no-native-agents.json now
+# carries context_window 1048576. The earlier 258,400 came from a seat launched
+# before the OVERRIDE_KEYS fix reached the runtime, i.e. from a catalog still
+# holding Codex's generic 272000. It was a stale reading, not a hidden ceiling,
+# and the conclusion drawn from it - that model_context_window does not govern -
+# was wrong.
+#
+# The owner's 300k compact limit is therefore reachable, and is set. 307200
+# (300 * 1024) is 31% of a 996,147-token ceiling, leaving ~689k of headroom.
+# 196608 was chosen defensively against the stale number and is no longer the
+# safer value; it is merely an earlier one.
+#
+# 2026-09-13 - DEEPSEEK NOW HAS A CATALOG ENTRY, and the paragraph that stood
+# here got the mechanism wrong. deepseek-v4.1-flash is not in
+# `codex debug models`, so Codex ran it on fallback metadata: 21 "Unknown model
+# deepseek-v4.1-flash ... fallback model metadata" warnings sit in
+# ~/.codex-runtime/peer/logs_2.sqlite. That fallback carries
+# max_context_window 272000, which clamps model_context_window
+# (codex-rs/models-manager/src/model_info.rs, rust-v0.146.1). It did NOT stop
+# auto-compaction: ModelInfo::auto_compact_token_limit clamps the limit to 90%
+# of the window, so a DeepSeek seat compacted at 244,800 against a 258,400
+# ceiling - about 13.6k of headroom, which one large tool output overruns.
+# Owner directive 2026-09-13: give the catalog the entry.
+# ~/.codex/peer.catalog-extra.json mirrors that fallback field for field and
+# codex-room-sync appends it before patching windows, so DeepSeek now receives
+# the 1048576 below like every other model. DeepInfra, which serves it, lists
+# deepseek-ai/DeepSeek-V4.1-Flash at 1,048,576 tokens. MEASURED 2026-09-13:
+# seat b15c9cab on deepseek-v4.1-flash reports contextWindowMaxTokens = 996147
+# and logs auto_compact_scope_limit=Some(307200). A DeepSeek seat reporting
+# 258,400 again means the entry stopped matching.
+model_context_window = 1048576
+model_auto_compact_token_limit = 307200
+
+# deepseek-v4.1-flash is this seat's default. Keep this equal to the
+# `isDefault` model under codex-peer in ~/.paseo/config.json: the two
+# disagreeing is what let a seat run healthy on DeepSeek while its record read
+# as Sol.
+model = "deepseek-v4.1-flash"
+model_reasoning_effort = "medium"
+model_reasoning_summary = "none"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+
+# Owner directive 2026-09-14: the OCR coverage lane block is removed. The
+# prompt below follows the reference Peer config and keeps the handback,
+# verification and no-orchestration clauses the room already required.
+developer_instructions = """
+Room role: Peer. You are a persistent engineering collaborator responsible for the judgment inside the scope assigned by Lead.
+
+Treat the brief as an outcome and ownership boundary, not a prescribed conclusion. Investigate enough to form your own technical position, reject a false premise, and reopen a material architecture constraint when evidence shows it endangers the outcome. Converse directly with Lead about cross-scope decisions, changed contracts, or consequential disagreement; make ordinary local decisions yourself.
+
+Independent judgment is not performative dissent. Do not manufacture objections, alternatives, speculative blockers, or approval requests to demonstrate rigor. Agreement is valid when the evidence supports it. Raise only issues that can materially change the result, route, boundary, or confidence.
+
+Stay within the room's single-owner law and report evidence honestly. Your responsibility may be implementation, investigation, architecture, review, audit, or advice; own that temporary responsibility rather than behaving as a one-shot answer function.
+
+Preserve unrelated work, verify your changes, and identify the exact candidate you hand back. Do not load the full WORKSPACE_PROTOCOL.md; use the constraints the brief supplies and ask Lead for a missing one. You have no orchestration authority: never create or coordinate agents. Hand back the exact artifact, personally observed evidence, unknowns, residual risk, and ownership state.
+"""

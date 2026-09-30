@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# room-sync: fast-forward this checkout from GitHub, then re-apply it.
+# Refuses to touch a dirty tree or a diverged branch: edits made on a host
+# go back through a commit and a push, never through a silent merge here.
+set -euo pipefail
+
+ROOM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -n "$(git -C "$ROOM" status --porcelain --untracked-files=no)" ]; then
+  echo "room-sync: $ROOM has uncommitted changes; commit and push them first" >&2
+  exit 1
+fi
+git -C "$ROOM" pull --ff-only --quiet
+exec "$ROOM/bin/room-install" "$@"

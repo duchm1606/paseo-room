@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# room-install [host]: apply this checkout to the machine it runs on.
+#
+# The repo is the source; each tool keeps reading its own home. This script
+# is the only thing that writes from one to the other, and it is idempotent:
+# a second run with nothing changed touches nothing.
+#
+#   hosts/<host>.json        -> ~/.paseo/config.json   (pluginsEnabled, plugins,
+#                                                      agents.providers; every
+#                                                      other key is daemon-owned
+#                                                      and left alone)
+#   claude/seat-settings.json -> ~/.claude/profiles/{settings.json,
+#                                claude-<role>/settings.json}  (hooks, plugin
+#                                kill-switch; each file keeps its own token)
+#   skills/                  <- ~/.claude/profiles/claude-<role>/skills (symlink)
+#   codex/bin/*              <- ~/.local/bin/codex-room{,-sync}  (symlinks)
+#   codex/peer.*             <- ~/.codex/peer.{config.toml,catalog-extra.json}
+#
+# Secrets never live in the repo. A seat settings file that does not exist yet
+# takes its CLAUDE_CODE_OAUTH_TOKEN from the seat template, else from the
+# operator's ~/.claude/settings.json; with neither, the seat is left unseeded
+# and smoke says so. Rotate afterwards with `claude-seat-token`.
+#
+# The daemon is NOT restarted: that would kill every running agent. Restart it
+# yourself when no seat is mid-task.
+set -euo pipefail
+
+ROOM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOST_FILE="$HOME/.paseo/room-host"
+host="${1:-$(cat "$HOST_FILE" 2>/dev/null || true)}"
+[ -n "$host" ] || { echo "usage: room-install <host>   (hosts: $(cd "$ROOM/hosts" && ls *.json | sed 's/\.json$//' | tr '\n' ' '))" >&2; exit 2; }
+HOST_JSON="$ROOM/hosts/$host.json"
+[ -f "$HOST_JSON" ] || { echo "room-install: no hosts/$host.json" >&2; exit 2; }
+[ "$ROOM" = "$HOME/.paseo/orchestration" ] \
+  || { echo "room-install: checkout is at $ROOM; the daemon launches seats from ~/.paseo/orchestration" >&2; exit 2; }
+
+for dep in jq claude; do
+  command -v "$dep" >/dev/null || { echo "room-install: $dep not on PATH" >&2; exit 3; }
+done
+
+ts="$(date +%Y%m%d-%H%M%S)"
+umask 077
+say() { printf 'room-install: %s\n' "$*"; }
+
+rendered="$(jq --arg h "$HOME" 'walk(if type=="string" then gsub("@HOME@"; $h) else . end)' "$HOST_JSON")"
+uses_codex_room="$(jq -r --arg c "$HOME/.local/bin/codex-room" \
+  '[.agents.providers[] | select(.command[0]? == $c)] | length > 0' <<<"$rendered")"
+
+# place <target> <source>: make target a symlink to source. A real file with the
+# same content is swapped silently; a different one is kept as a backup.
+place() {
+  local target="$1" source="$2"
+  mkdir -p "$(dirname "$target")"
+  if [ -L "$target" ] && [ "$(readlink "$target")" = "$source" ]; then return 0; fi
+  if [ -e "$target" ] && [ ! -L "$target" ] && ! cmp -s "$target" "$source"; then
+    mv "$target" "$target.bak-room-$ts"
+    say "kept the previous $target as $target.bak-room-$ts"
+  fi
+  ln -sfn "$source" "$target"
+  say "linked $target -> $source"
+}
+
+# 1. Codex seat wiring, only where a provider launches through codex-room.
+if [ "$uses_codex_room" = true ]; then
+  for dep in codex python3; do
+    command -v "$dep" >/dev/null || { echo "room-install: $dep not on PATH (needed by codex-room)" >&2; exit 3; }
+  done
+  place "$HOME/.local/bin/codex-room" "$ROOM/codex/bin/codex-room"
+  place "$HOME/.local/bin/codex-room-sync" "$ROOM/codex/bin/codex-room-sync"
+  place "$HOME/.codex/peer.config.toml" "$ROOM/codex/peer.config.toml"
+  place "$HOME/.codex/peer.catalog-extra.json" "$ROOM/codex/peer.catalog-extra.json"
+fi
+
+# 2. Claude seat settings: managed keys from the repo, token from the file.
+TEMPLATE="$ROOM/claude/seat-settings.json"
+SEAT_TPL="$HOME/.claude/profiles/settings.json"
+token_of() { jq -r '.env.CLAUDE_CODE_OAUTH_TOKEN // ""' "$1" 2>/dev/null || true; }
+write_settings() { # write_settings <file> <token>
+  local file="$1" token="$2" tmp
+  mkdir -p "$(dirname "$file")"
+  tmp="$(mktemp "$file.XXXXXX")"
+  if [ -f "$file" ] && [ ! -L "$file" ]; then
+    jq --slurpfile t "$TEMPLATE" --arg tok "$token" \
+      '. * $t[0] | if $tok == "" then . else .env.CLAUDE_CODE_OAUTH_TOKEN = $tok end' "$file" > "$tmp"
+  else
+    jq --arg tok "$token" \
+      'if $tok == "" then . else .env.CLAUDE_CODE_OAUTH_TOKEN = $tok end' "$TEMPLATE" > "$tmp"
+  fi
+  chmod 600 "$tmp"
+  if [ -f "$file" ] && [ ! -L "$file" ] && cmp -s "$tmp" "$file"; then rm -f "$tmp"; return 0; fi
+  [ -L "$file" ] && rm -f "$file"
+  mv "$tmp" "$file"
+  say "updated $file"
+}
+
+seed_token="$(token_of "$SEAT_TPL")"
+[ -n "$seed_token" ] || seed_token="$(token_of "$HOME/.claude/settings.json")"
+write_settings "$SEAT_TPL" "$seed_token"
+for role in lead peer supervisor; do
+  p="$HOME/.claude/profiles/claude-$role"
+  tok="$(token_of "$p/settings.json")"
+  write_settings "$p/settings.json" "${tok:-$seed_token}"
+  if [ -L "$p/skills" ] || [ ! -e "$p/skills" ]; then
+    [ "$(readlink "$p/skills" 2>/dev/null)" = "$ROOM/skills" ] || { ln -sfn "$ROOM/skills" "$p/skills"; say "linked $p/skills -> $ROOM/skills"; }
+  fi
+done
+unset seed_token tok
+
+# 3. Paseo provider table.
+CONFIG="$HOME/.paseo/config.json"
+[ -f "$CONFIG" ] || { echo "room-install: $CONFIG missing; start the daemon once so it writes its own keys" >&2; exit 3; }
+tmp="$(mktemp "$CONFIG.XXXXXX")"
+jq --argjson h "$rendered" \
+  '.pluginsEnabled = $h.pluginsEnabled | .plugins = $h.plugins | .agents.providers = $h.agents.providers' \
+  "$CONFIG" > "$tmp"
+chmod 600 "$tmp"
+if cmp -s "$tmp" "$CONFIG"; then
+  rm -f "$tmp"
+else
+  cp -p "$CONFIG" "$CONFIG.bak-room-$ts"
+  mv "$tmp" "$CONFIG"
+  say "updated $CONFIG (previous: $CONFIG.bak-room-$ts); restart the daemon to load it"
+fi
+
+printf '%s\n' "$host" > "$HOST_FILE"
+"$ROOM/tests/smoke.sh"
