@@ -66,8 +66,8 @@ done
 host="$(cat "$HOME/.paseo/room-host" 2>/dev/null || true)"
 if [ -n "$host" ]; then
   want="$(jq -S --arg h "$HOME" 'walk(if type=="string" then gsub("@HOME@"; $h) else . end)
-    | {pluginsEnabled, plugins, providers: .agents.providers}' "$ROOM/hosts/$host.json")"
-  have="$(jq -S '{pluginsEnabled, plugins, providers: .agents.providers}' "$HOME/.paseo/config.json")"
+    | {mcp: .daemon.mcp, pluginsEnabled, plugins, providers: .agents.providers}' "$ROOM/hosts/$host.json")"
+  have="$(jq -S '{mcp: .daemon.mcp, pluginsEnabled, plugins, providers: .agents.providers}' "$HOME/.paseo/config.json")"
   [ "$want" = "$have" ] || die "~/.paseo/config.json drifted from hosts/$host.json (run bin/room-install, or move the edit into the repo)"
 fi
 
@@ -86,6 +86,11 @@ if jq -e '.agents.providers | has("watcher")' "$HOME/.paseo/config.json" >/dev/n
   done
   [ "$(gate view_file '')" = deny ] || die "watcher gate allows view_file"
 fi
+
+# 4b''. One control plane: Paseo MCP reaches only Lead and Supervisor seats.
+jq -e '.daemon.mcp.injectIntoAgents == true and (.daemon.mcp.injectIntoProviders | sort) == ["lead","supervisor"]' \
+  "$HOME/.paseo/config.json" >/dev/null \
+  || die "daemon.mcp must inject Paseo tools into exactly lead and supervisor"
 
 # 4c. Room skills are well-formed: one SKILL.md per directory, named after it.
 for d in "$ROOM"/skills/*/; do

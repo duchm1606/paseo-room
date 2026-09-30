@@ -1,4 +1,13 @@
 {
+  "daemon": {
+    "mcp": {
+      "injectIntoAgents": true,
+      "injectIntoProviders": [
+        "lead",
+        "supervisor"
+      ]
+    }
+  },
   "pluginsEnabled": false,
   "plugins": {},
   "agents": {

@@ -23,7 +23,7 @@ one machine; GitHub carries it between machines.
 └── tests/smoke.sh
 
 Installed by room-install (symlink or rendered copy):
-~/.paseo/config.json           pluginsEnabled, plugins, agents.providers
+~/.paseo/config.json           daemon.mcp, pluginsEnabled, plugins, agents.providers
                                <- hosts/<host>.json with @HOME@ expanded
 ~/.claude/profiles/settings.json            seat template   } managed keys from
 ~/.claude/profiles/claude-<role>/settings.json  per seat    } claude/, token kept

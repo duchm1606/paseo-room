@@ -5,8 +5,8 @@
 # is the only thing that writes from one to the other, and it is idempotent:
 # a second run with nothing changed touches nothing.
 #
-#   hosts/<host>.json        -> ~/.paseo/config.json   (pluginsEnabled, plugins,
-#                                                      agents.providers; every
+#   hosts/<host>.json        -> ~/.paseo/config.json   (daemon.mcp, pluginsEnabled,
+#                                                      plugins, agents.providers; every
 #                                                      other key is daemon-owned
 #                                                      and left alone)
 #   claude/seat-settings.json -> ~/.claude/profiles/{settings.json,
@@ -122,7 +122,7 @@ CONFIG="$HOME/.paseo/config.json"
 [ -f "$CONFIG" ] || { echo "room-install: $CONFIG missing; start the daemon once so it writes its own keys" >&2; exit 3; }
 tmp="$(mktemp "$CONFIG.XXXXXX")"
 jq --argjson h "$rendered" \
-  '.pluginsEnabled = $h.pluginsEnabled | .plugins = $h.plugins | .agents.providers = $h.agents.providers' \
+  '.daemon.mcp = $h.daemon.mcp | .pluginsEnabled = $h.pluginsEnabled | .plugins = $h.plugins | .agents.providers = $h.agents.providers' \
   "$CONFIG" > "$tmp"
 chmod 600 "$tmp"
 if cmp -s "$tmp" "$CONFIG"; then

@@ -23,8 +23,8 @@ immediately. There is no build step between you and production.
 - Never edit generated state: `~/.codex-runtime/<role>/` is rebuilt on every
   launch; `~/.claude/profiles/claude-<role>/` is seat-live state (only its
   seeded symlinks are managed, by `bin/claude-profile`).
-- `~/.paseo/config.json` is daemon-owned except `pluginsEnabled`, `plugins`
-  and `agents.providers`, which room-install renders from
+- `~/.paseo/config.json` is daemon-owned except `daemon.mcp`, `pluginsEnabled`,
+  `plugins` and `agents.providers`, which room-install renders from
   `hosts/<host>.json` (`@HOME@` becomes the host's home). Change the host
   file, run `bin/room-install`, then restart the daemon when no seat is
   mid-task. `tests/smoke.sh` fails on drift between the two.
