@@ -82,7 +82,7 @@ esac
 # Lead: coordination, routing, acceptance. Never implements, never pre-solves,
 # never runs intake — it receives a scope already locked by the owner.
 LEAD_ALLOW=" visual-explainer domain-modeling triage to-issues
- repo-refresh triple-review ultra-review "
+ repo-refresh triple-review "
 
 # Peer: engineering inside one assigned scope. No coordination, no intake,
 # no harness configuration — those belong to Lead or Supervisor.
