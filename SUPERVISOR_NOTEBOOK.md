@@ -6331,3 +6331,7 @@ asked.
   lane assigned until the owner names one.
 - Not touched: ~/.paseo/orchestration/paseo/config.json (wiring reference, already stale and
   carrying someone else's uncommitted edits).
+
+- 2026-09-30 wyrmspire (lead 697f1d2): pattern "owner-bound Lead report never reaches Supervisor". The Supervisor is notified only when a Lead turn it prompted finishes. A Lead turn woken by its own background `paseo wait` (Peer handback) ends silently. Two owner-facing reports (task 2 retuning proposals, task 3a ready) sat in the Lead log about 50 min until the owner asked. Mitigation: on any owner status question read the Lead log tail; candidate fix is for the Lead to `paseo send` its parent when an owner-bound report is ready.
+- 2026-09-30 wyrmspire (lead 697f1d2), protocol gap reported by the Lead: an agent-scoped `paseo run` ignores --cwd and puts the seat in the caller's workspace (the main checkout). The pinned Reviewer/Architect command in wyrmspire WORKSPACE_PROTOCOL.md (`--cwd <worktree path>`) is therefore wrong; use `--workspace <id>`. It happened once, was caught after one read-only command, and main was untouched. Owner-gated protocol edit, not applied.
+- 2026-09-30 wyrmspire: Supervisor error, corrected to the owner. I told the owner they would decide the merge to main, but the protocol lets the Lead fast-forward local main after acceptance; only push is the owner's. Also: I started the Lead with mode "default" (per-tool prompts) and switched it to bypassPermissions per the owner's directive in the protocol.
