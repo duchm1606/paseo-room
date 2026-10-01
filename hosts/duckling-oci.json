@@ -148,7 +148,7 @@
       "codex-peer": {
         "extends": "codex",
         "label": "Codex Peer",
-        "description": "Bounded engineering collaborator on CLIProxy-routed DeepSeek; no Paseo tools. duckling-oci runs CLIProxyAPI with OpenCodeGo/deepseek-v4.1-flash only, so this is the one model. codex-room reads CLIPROXY_API_KEY from the daemon environment (systemd EnvironmentFile ~/.config/cliproxy.env). deepseek-v4.1-flash is the declared default in BOTH this table and ~/.codex/peer.config.toml; keep those two in step. Fast mode stays off: do not pass featureValues.fast_mode to create_agent here.",
+        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools. Two models on duckling-oci: deepseek-v4.1-flash (OpenCodeGo, the default) and gpt-6.1-sol (Codex OAuth account nguyenanhem91, moved here from the Mac 2026-10-01). gpt-6.1-sol is the image lane: Codex exposes its built-in image_gen tool only because [model_providers.cliproxy] in ~/.codex/config.toml carries an x-openai-actor-authorization header (codex-rs image_generation_available); codex-room-sync carries that table into the peer runtime. gpt-6.1-sol is off the Codex catalog, so its entry lives in codex/peer.catalog-extra.json and the host ~/.codex/model-catalog.1m.json (cloned from gpt-6-sol). codex-room reads CLIPROXY_API_KEY from the daemon environment (systemd EnvironmentFile ~/.config/cliproxy.env). deepseek-v4.1-flash is the declared default in BOTH this table and codex/peer.config.toml; keep those two in step. Fast mode stays off: do not pass featureValues.fast_mode to create_agent here.",
         "command": [
           "@HOME@/.local/bin/codex-room",
           "peer"
@@ -167,6 +167,33 @@
               {
                 "id": "none",
                 "label": "None"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6.1-sol",
+            "label": "GPT-6.1 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
               }
             ]
           }
@@ -198,6 +225,33 @@
               {
                 "id": "none",
                 "label": "None"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6.1-sol",
+            "label": "GPT-6.1 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
               }
             ]
           }
