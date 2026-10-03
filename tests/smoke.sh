@@ -28,12 +28,14 @@ done
 
 # 3. Provider commands: claude seats launch from the room checkout; the seats
 #    built on another tool launch from ~/.local/bin, where that tool's own
-#    config lives — codex-room for Codex, agy-acp for the Gemini ACP bridge.
+#    config lives — codex-room for Codex, agy-acp for the Gemini ACP bridge,
+#    droid for Factory Droid (native ACP, no bridge).
 outside="$(jq -r '.agents.providers | to_entries[] | select(.value.command) | .value.command[0]' \
   "$HOME/.paseo/config.json" \
   | grep -v -e "^$HOME/.paseo/orchestration/bin/" \
             -e "^$HOME/.local/bin/codex-room$" \
-            -e "^$HOME/.local/bin/agy-acp$")"
+            -e "^$HOME/.local/bin/agy-acp$" \
+            -e "^$HOME/.local/bin/droid$")"
 [ -z "$outside" ] || die "unexpected provider command: $outside"
 
 # 4. Codex roles the provider table actually launches: installed from this
