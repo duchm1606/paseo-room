@@ -49,6 +49,11 @@
             "type": "command",
             "command": "bash \"$HOME\"/.paseo/orchestration/hooks/telemetry.sh stop",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"$HOME\"/.paseo/orchestration/hooks/notify-on-stop.sh",
+            "timeout": 10
           }
         ]
       }

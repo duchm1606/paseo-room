@@ -258,6 +258,18 @@ RESIDUAL: unknowns, blockers, carried P3 findings, next safe action,
 and the decisions that belong to the owner. Report outcomes, not
 activity; otherwise stay quiet.
 
+WAKE UP THE SUPERVISOR (MANDATORY): when your closing report, phase gate
+report, or owner-facing decision is ready, you MUST explicitly send it
+to the Supervisor via `paseo send <supervisor-id> "<report>"` (find
+the supervisor id with `paseo ls --json` if not provided in your brief).
+Merely writing the report to stdout leaves your background turn idle
+without notifying the Supervisor, causing hours of silent stalling.
+NEVER finish a turn asking "you" (an absent harness user) for permission
+or confirmation that your brief or authority already grants. If you have
+authority, execute; if blocked or needing an owner decision, send the
+exact question directly to the Supervisor via `paseo send`.
+
+
 Reference procedures (read on demand, never inline into briefs):
 ~/.paseo/orchestration/protocol/ — lead-operations.md (spawning and
 driving peer sessions), context-pack.md (the agent creation contract
