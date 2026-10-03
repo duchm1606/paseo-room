@@ -352,6 +352,33 @@
           }
         },
         "order": 23
+      },
+      "droid": {
+        "extends": "acp",
+        "label": "Factory Droid",
+        "description": "duckling-oci only. Factory Droid 0.233.0 linux-arm64 at ~/.local/bin/droid (official installer, sha256 verified), which speaks ACP natively through droid exec --output-format acp, so no bridge is needed. Auth is the device-pairing login stored in ~/.factory (auth.v2.file), done 2026-10-04; FACTORY_API_KEY is the headless alternative if that login lapses. Verified by hand on 2026-10-04: initialize, session/new and a prompt turn ending stopReason=end_turn. The live session reports 5 autonomy modes (normal, spec, auto-low, auto-medium, auto-high), 58 models and reasoning_effort as thought_level, so this entry declares no models or modes. Paseo spawns one droid process per agent, so Factory-AI/factory#46 (session/new inheriting earlier context inside one process) does not apply. Same ACP-seat limits as gemini-peer: no role law, disallowedTools would be silently dropped, and MCP is all-or-nothing through supportsMcpServers. It is off here, which makes this seat Peer-shaped with no Paseo tools. Auto-update is off through env, so the binary changes only when someone reinstalls it.",
+        "command": [
+          "@HOME@/.local/bin/droid",
+          "exec",
+          "--output-format",
+          "acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "DROID_DISABLE_AUTO_UPDATE": "true",
+          "FACTORY_DROID_AUTO_UPDATE_ENABLED": "false"
+        },
+        "params": {
+          "supportsMcpServers": false,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 30
       }
     }
   }
