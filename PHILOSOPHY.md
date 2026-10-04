@@ -198,7 +198,7 @@ enforcement surface is a slogan.
 | Hard cut + test discipline | per-repo doctrine (CLAUDE.md / dev policy) — NOT yet global | check each greenfield repo carries it |
 | Notebook aggregation | SUPERVISOR_NOTEBOOK.md Active-patterns table | rows gain `observed→applied→adopted` states over time |
 | Cheap-model economics | supervisor provider Sonnet entry; scouts on Haiku | config.json models; ultra-review SKILL.md |
-| MCP surface per role | config.json `injectIntoProviders` (lead, supervisor) + peer `disallowedTools mcp__paseo` | config.json |
+| MCP surface per role | Paseo injects into every seat that accepts MCP; each Peer-shaped seat is fenced: `disallowedTools mcp__paseo`, or `supportsMcpServers=false` on ACP seats | hosts/*.json; smoke 4b'' |
 
 ## Known open items
 

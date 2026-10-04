@@ -90,25 +90,35 @@ if jq -e '.agents.providers | has("watcher")' "$HOME/.paseo/config.json" >/dev/n
   [ "$(gate view_file '')" = deny ] || die "watcher gate allows view_file"
 fi
 
-# 4b''. One control plane: Paseo MCP reaches only Lead and Supervisor seats.
-jq -e '.daemon.mcp.injectIntoAgents == true and (.daemon.mcp.injectIntoProviders | sort) == ["lead","supervisor"]' \
-  "$HOME/.paseo/config.json" >/dev/null \
-  || die "daemon.mcp must inject Paseo tools into exactly lead and supervisor"
+# 4b''. One control plane: only Lead and Supervisor seats hold the Paseo tools.
+#       Paseo has no per-provider MCP allowlist: injectIntoAgents injects its
+#       MCP into every seat that accepts MCP (read in the daemon source
+#       2026-10-04; the injectIntoProviders key this check asserted until then
+#       was never read). So every Peer-shaped seat carries its own barrier:
+#       mcp__paseo in disallowedTools, or params.supportsMcpServers=false on
+#       an ACP seat, where disallowedTools is dropped.
+jq -e '.daemon.mcp.injectIntoAgents == true' "$HOME/.paseo/config.json" >/dev/null \
+  || die "daemon.mcp.injectIntoAgents must be true: Lead and Supervisor seats need the Paseo tools"
+jq -e '.daemon.mcp | has("injectIntoProviders") | not' "$HOME/.paseo/config.json" >/dev/null \
+  || die "daemon.mcp.injectIntoProviders is not a Paseo setting; fence each Peer-shaped seat instead"
+unfenced="$(jq -r '.agents.providers | to_entries[]
+  | select(.key == "peer" or (.key | endswith("-peer")) or .key == "watcher" or .value.env.ROOM_ROLE? == "peer")
+  | select(if .value.extends == "acp" then .value.params.supportsMcpServers != false
+           else ((.value.disallowedTools // []) | index("mcp__paseo")) == null end)
+  | .key' "$HOME/.paseo/config.json")"
+[ -z "$unfenced" ] || die "Peer-shaped seats with no barrier against the Paseo MCP: $(echo $unfenced)"
 
 # 4b'''. Droid seats: law and gate come from droid/seat-settings.json through
 #        --settings, skills from ~/.factory/skills, and the gate denies what it
-#        must. Paseo 0.10.2 never reads injectIntoProviders, so it injects its
-#        MCP into every seat that accepts MCP: a Droid Peer's only barrier is
-#        params.supportsMcpServers=false.
+#        must. A Droid Peer's MCP fence is checked with the others in 4b''.
 droid_seats="$(jq -r '.agents.providers | to_entries[]
   | select(.value.env.ROOM_ROLE? and (.value.command[0]? | tostring | endswith("/.local/bin/droid")))
-  | "\(.key) \(.value.env.ROOM_ROLE) \(.value.params.supportsMcpServers != false) \(.value.command | index("--settings") as $i | if $i then .[$i + 1] else "" end)"' \
+  | "\(.key) \(.value.env.ROOM_ROLE) \(.value.command | index("--settings") as $i | if $i then .[$i + 1] else "" end)"' \
   "$HOME/.paseo/config.json")"
 if [ -n "$droid_seats" ]; then
-  while read -r name role mcp settings; do
+  while read -r name role settings; do
     [ "$settings" = "$ROOM/droid/seat-settings.json" ] || die "$name: must launch with --settings $ROOM/droid/seat-settings.json"
     [ -f "$ROOM/roles/$role.md" ] || die "$name: ROOM_ROLE=$role has no roles/$role.md"
-    [ "$role" != peer ] || [ "$mcp" = false ] || die "$name: a Droid Peer needs params.supportsMcpServers=false, or it receives the Paseo tools"
   done <<<"$droid_seats"
   [ "$(readlink "$HOME/.factory/skills")" = "$ROOM/skills" ] || die "droid seats: ~/.factory/skills must link to $ROOM/skills"
   dgate() { # dgate <role> <tool> <input-json> -> allow|deny

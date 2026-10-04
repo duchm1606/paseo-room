@@ -278,11 +278,14 @@ not a front door, not a second Lead.
 
 ## Control-plane mechanics (validated by the live setup)
 
-- **MCP allowlist, not blocklist.** Paseo MCP tools are injected only
-  into the `lead` (and phase-3 `supervisor`) providers via
-  `daemon.mcp.injectIntoProviders`. This closes v1's "tool-level
-  protocol leak" item by construction; `mcp__paseo` in peer
-  `disallowedTools` stays as belt-and-braces.
+- **One MCP switch, a fence on every Peer.** Paseo has no per-provider
+  MCP allowlist: `daemon.mcp.injectIntoAgents` injects the Paseo MCP
+  into every seat that accepts MCP. The `injectIntoProviders` key this
+  bullet cited until 2026-10-04 was never read by the daemon (checked in
+  its source on both hosts). The fence is on each Peer-shaped seat:
+  `mcp__paseo` in `disallowedTools`, or `params.supportsMcpServers=false`
+  on an ACP seat, where `disallowedTools` is dropped. Smoke fails on a
+  Peer-shaped seat without one.
 - **Disable native subagents at the deepest available layer.**
   `Agent`/`Workflow` (and legacy `Task`) in `disallowedTools` for every
   profile (verified live 2026-08-02). Instructions alone are never the

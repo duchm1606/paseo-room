@@ -1,11 +1,7 @@
 {
   "daemon": {
     "mcp": {
-      "injectIntoAgents": true,
-      "injectIntoProviders": [
-        "lead",
-        "supervisor"
-      ]
+      "injectIntoAgents": true
     }
   },
   "pluginsEnabled": false,
@@ -332,7 +328,7 @@
       "watcher": {
         "extends": "acp",
         "label": "Watcher",
-        "description": "Read-only Watcher on Gemini, started and fed only by the Supervisor (roles/supervisor.md, Watcher section). Built on the agy-acp ACP bridge like gemini-peer, so roles/*.md cannot be injected by Paseo; instead AGY_EXTRA_ARGS adds @HOME@/.paseo/watcher to every agy run, and agy loads that directory's AGENTS.md (-> roles/watcher.md) as rules and its .agents/hooks.json as a PreToolUse gate (watcher/watcher-gate.sh). The gate, not the prompt, is the boundary: every tool is denied except run_command of paseo ls|logs|inspect, so the seat cannot read or write files, run other commands, or message seats. --dangerously-skip-permissions is required because a hook allow does not grant headless permission; the hook deny still wins (verified 2026-09-30). The directory must stay outside any git repository: agy walks from it to the repo root and would load that repo's AGENTS.md too (verified with the room checkout). No Paseo MCP (supportsMcpServers=false, and watcher is not in injectIntoProviders). Runs on both hosts; on duckling-oci agy is installed as described on gemini-peer.",
+        "description": "Read-only Watcher on Gemini, started and fed only by the Supervisor (roles/supervisor.md, Watcher section). Built on the agy-acp ACP bridge like gemini-peer, so roles/*.md cannot be injected by Paseo; instead AGY_EXTRA_ARGS adds @HOME@/.paseo/watcher to every agy run, and agy loads that directory's AGENTS.md (-> roles/watcher.md) as rules and its .agents/hooks.json as a PreToolUse gate (watcher/watcher-gate.sh). The gate, not the prompt, is the boundary: every tool is denied except run_command of paseo ls|logs|inspect, so the seat cannot read or write files, run other commands, or message seats. --dangerously-skip-permissions is required because a hook allow does not grant headless permission; the hook deny still wins (verified 2026-09-30). The directory must stay outside any git repository: agy walks from it to the repo root and would load that repo's AGENTS.md too (verified with the room checkout). No Paseo MCP (supportsMcpServers=false). Runs on both hosts; on duckling-oci agy is installed as described on gemini-peer.",
         "command": [
           "@HOME@/.local/bin/agy-acp"
         ],
@@ -443,7 +439,7 @@
       "droid-peer": {
         "extends": "acp",
         "label": "Droid Peer",
-        "description": "Peer on Factory Droid (duckling-oci). MCP off, and that is the only barrier: Paseo 0.10.2 never reads daemon.mcp.injectIntoProviders, and disallowedTools does not reach an ACP seat, so with MCP on this seat would receive the Paseo tools. Smoke enforces it. Same droid install and Factory login as the droid entry. Role law: under ACP droid ignores --append-system-prompt (verified 2026-10-04), so droid/seat-settings.json, loaded through --settings, runs hooks/inject-profile.sh at SessionStart (startup, resume, clear, compact) and prints roles/$ROOM_ROLE.md into context, the same fallback the Claude seats keep. That is context, not a system prompt. Gate: droid/role-gate.sh denies the delegation only Droid has (missions, automations, Loop, GenerateDroid, settings staging) and hands Task, Execute, Create/Edit/ApplyPatch and Skill to hooks/role-gate.sh under their Claude names, so the skill matrix lives in one place. Skills come from ~/.factory/skills, which room-install links to the room skills. Telemetry is not wired (telemetry.sh would mix these seats into the Claude role logs). Models, autonomy modes and reasoning come from the live session; a seat starts in Auto (Off), read-only, so pick the autonomy level when creating it.",
+        "description": "Peer on Factory Droid (duckling-oci). MCP off, and that is the only barrier: Paseo injects its MCP into every seat that accepts MCP (daemon.mcp.injectIntoAgents is the only switch), and disallowedTools does not reach an ACP seat, so with MCP on this seat would receive the Paseo tools. Smoke enforces it. Same droid install and Factory login as the droid entry. Role law: under ACP droid ignores --append-system-prompt (verified 2026-10-04), so droid/seat-settings.json, loaded through --settings, runs hooks/inject-profile.sh at SessionStart (startup, resume, clear, compact) and prints roles/$ROOM_ROLE.md into context, the same fallback the Claude seats keep. That is context, not a system prompt. Gate: droid/role-gate.sh denies the delegation only Droid has (missions, automations, Loop, GenerateDroid, settings staging) and hands Task, Execute, Create/Edit/ApplyPatch and Skill to hooks/role-gate.sh under their Claude names, so the skill matrix lives in one place. Skills come from ~/.factory/skills, which room-install links to the room skills. Telemetry is not wired (telemetry.sh would mix these seats into the Claude role logs). Models, autonomy modes and reasoning come from the live session; a seat starts in Auto (Off), read-only, so pick the autonomy level when creating it.",
         "command": [
           "@HOME@/.local/bin/droid",
           "exec",
