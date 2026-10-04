@@ -102,7 +102,7 @@ jq -e '.daemon.mcp.injectIntoAgents == true and (.daemon.mcp.injectIntoProviders
 #        params.supportsMcpServers=false.
 droid_seats="$(jq -r '.agents.providers | to_entries[]
   | select(.value.env.ROOM_ROLE? and (.value.command[0]? | tostring | endswith("/.local/bin/droid")))
-  | "\(.key) \(.value.env.ROOM_ROLE) \(.value.params.supportsMcpServers // true) \(.value.command | index("--settings") as $i | if $i then .[$i + 1] else "" end)"' \
+  | "\(.key) \(.value.env.ROOM_ROLE) \(.value.params.supportsMcpServers != false) \(.value.command | index("--settings") as $i | if $i then .[$i + 1] else "" end)"' \
   "$HOME/.paseo/config.json")"
 if [ -n "$droid_seats" ]; then
   while read -r name role mcp settings; do
