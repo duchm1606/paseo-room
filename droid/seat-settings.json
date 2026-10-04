@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Task|TaskOutput|TaskStop|ProposeMission|StartMissionRun|EndFeatureRun|DismissHandoffItems|Loop|GenerateDroid|CreateAutomation|EditAutomation|DeleteAutomation|RunAutomation|StageSettingsChanges|Execute|Create|Edit|ApplyPatch|Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME\"/.paseo/orchestration/droid/role-gate.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME\"/.paseo/orchestration/hooks/inject-profile.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -19,10 +19,11 @@ bash -n "$ROOM/bin/claude-profile" "$ROOM/bin/claude-lead" "$ROOM/bin/claude-pee
   "$ROOM/bin/claude-supervisor" "$ROOM/bin/claude-seat-token" \
   "$ROOM/bin/room-install" "$ROOM/bin/room-sync" \
   "$ROOM/codex/bin/codex-room" "$ROOM"/hooks/*.sh "$ROOM/watcher/watcher-gate.sh" \
+  "$ROOM/droid/role-gate.sh" \
   || die "bash -n on launchers/hooks"
 python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$ROOM/codex/bin/codex-room-sync" \
   || die "codex-room-sync does not parse"
-for f in "$ROOM"/hosts/*.json "$ROOM/claude/seat-settings.json"; do
+for f in "$ROOM"/hosts/*.json "$ROOM/claude/seat-settings.json" "$ROOM/droid/seat-settings.json"; do
   jq -e . "$f" >/dev/null || die "$f is not valid JSON"
 done
 
@@ -93,6 +94,42 @@ fi
 jq -e '.daemon.mcp.injectIntoAgents == true and (.daemon.mcp.injectIntoProviders | sort) == ["lead","supervisor"]' \
   "$HOME/.paseo/config.json" >/dev/null \
   || die "daemon.mcp must inject Paseo tools into exactly lead and supervisor"
+
+# 4b'''. Droid seats: law and gate come from droid/seat-settings.json through
+#        --settings, skills from ~/.factory/skills, and the gate denies what it
+#        must. Paseo 0.10.2 never reads injectIntoProviders, so it injects its
+#        MCP into every seat that accepts MCP: a Droid Peer's only barrier is
+#        params.supportsMcpServers=false.
+droid_seats="$(jq -r '.agents.providers | to_entries[]
+  | select(.value.env.ROOM_ROLE? and (.value.command[0]? | tostring | endswith("/.local/bin/droid")))
+  | "\(.key) \(.value.env.ROOM_ROLE) \(.value.params.supportsMcpServers // true) \(.value.command | index("--settings") as $i | if $i then .[$i + 1] else "" end)"' \
+  "$HOME/.paseo/config.json")"
+if [ -n "$droid_seats" ]; then
+  while read -r name role mcp settings; do
+    [ "$settings" = "$ROOM/droid/seat-settings.json" ] || die "$name: must launch with --settings $ROOM/droid/seat-settings.json"
+    [ -f "$ROOM/roles/$role.md" ] || die "$name: ROOM_ROLE=$role has no roles/$role.md"
+    [ "$role" != peer ] || [ "$mcp" = false ] || die "$name: a Droid Peer needs params.supportsMcpServers=false, or it receives the Paseo tools"
+  done <<<"$droid_seats"
+  [ "$(readlink "$HOME/.factory/skills")" = "$ROOM/skills" ] || die "droid seats: ~/.factory/skills must link to $ROOM/skills"
+  dgate() { # dgate <role> <tool> <input-json> -> allow|deny
+    local out
+    out="$(jq -cn --arg t "$2" --argjson i "$3" '{tool_name:$t, tool_input:$i}' | ROOM_ROLE="$1" bash "$ROOM/droid/role-gate.sh")"
+    if [ -z "$out" ]; then echo allow; else jq -r '.hookSpecificOutput.permissionDecision' <<<"$out"; fi
+  }
+  mem="$HOME/.claude/projects/x/memory/a.md"
+  for c in "peer|Task|{}" "lead|StartMissionRun|{}" "supervisor|CreateAutomation|{}" \
+           "supervisor|StageSettingsChanges|{}" "peer|Execute|{\"command\":\"ocr review .\"}" \
+           "peer|Skill|{\"skill\":\"session-navigation\"}" "peer|Create|{\"file_path\":\"$mem\"}" \
+           "lead|ApplyPatch|{\"input\":\"*** Begin Patch\\n*** Update File: $mem\\n*** End Patch\\n\"}"; do
+    IFS='|' read -r r t i <<<"$c"
+    [ "$(dgate "$r" "$t" "$i")" = deny ] || die "droid gate allows $t for $r"
+  done
+  for c in "peer|Execute|{\"command\":\"echo hi\"}" "peer|Skill|{\"skill\":\"tdd\"}" \
+           "lead|Skill|{\"skill\":\"triple-review\"}" "peer|ApplyPatch|{\"input\":\"*** Begin Patch\\n*** Add File: /tmp/x\\n*** End Patch\\n\"}"; do
+    IFS='|' read -r r t i <<<"$c"
+    [ "$(dgate "$r" "$t" "$i")" = allow ] || die "droid gate blocks $t for $r"
+  done
+fi
 
 # 4c. Room skills are well-formed: one SKILL.md per directory, named after it.
 for d in "$ROOM"/skills/*/; do

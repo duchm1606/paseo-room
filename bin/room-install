@@ -17,6 +17,9 @@
 #   codex/peer.*             <- ~/.codex/peer.{config.toml,catalog-extra.json}
 #   roles/watcher.md, watcher/ <- ~/.paseo/watcher/{AGENTS.md,.agents/}  (Watcher
 #                                law and tool gate, loaded by agy --add-dir)
+#   skills/                  <- ~/.factory/skills (symlink, where Droid seats exist;
+#                                their law and gate load from droid/seat-settings.json
+#                                in place, through droid --settings)
 #
 # Secrets never live in the repo. A seat settings file that does not exist yet
 # takes its CLAUDE_CODE_OAUTH_TOKEN from the seat template, else from the
@@ -80,6 +83,16 @@ if [ "$(jq -r '.agents.providers | has("watcher")' <<<"$rendered")" = true ]; th
   place "$HOME/.paseo/watcher/AGENTS.md" "$ROOM/roles/watcher.md"
   place "$HOME/.paseo/watcher/.agents/hooks.json" "$ROOM/watcher/hooks.json"
   place "$HOME/.paseo/watcher/.agents/watcher-gate.sh" "$ROOM/watcher/watcher-gate.sh"
+fi
+
+# 1c. Droid seats read skills from ~/.factory/skills, shared by every Droid
+#     session on the host. Link it to the room skills like a Claude seat's,
+#     unless it is already a real directory someone owns.
+if [ "$(jq -r '[.agents.providers[] | select(.env.ROOM_ROLE? and (.command[0]? | tostring | endswith("/.local/bin/droid")))] | length > 0' <<<"$rendered")" = true ]; then
+  f="$HOME/.factory/skills"
+  if [ -L "$f" ] || [ ! -e "$f" ]; then
+    [ "$(readlink "$f" 2>/dev/null)" = "$ROOM/skills" ] || { mkdir -p "$HOME/.factory"; ln -sfn "$ROOM/skills" "$f"; say "linked $f -> $ROOM/skills"; }
+  fi
 fi
 
 # 2. Claude seat settings: managed keys from the repo, token from the file.

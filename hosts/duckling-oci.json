@@ -379,6 +379,96 @@
           }
         },
         "order": 30
+      },
+      "droid-supervisor": {
+        "extends": "acp",
+        "label": "Droid Supervisor",
+        "description": "Supervisor-of-record on Factory Droid (duckling-oci). Paseo MCP on: Droid accepts the daemon's http MCP server and exposes its tools as paseo___*. Same droid install and Factory login as the droid entry. Role law: under ACP droid ignores --append-system-prompt (verified 2026-10-04), so droid/seat-settings.json, loaded through --settings, runs hooks/inject-profile.sh at SessionStart (startup, resume, clear, compact) and prints roles/$ROOM_ROLE.md into context, the same fallback the Claude seats keep. That is context, not a system prompt. Gate: droid/role-gate.sh denies the delegation only Droid has (missions, automations, Loop, GenerateDroid, settings staging) and hands Task, Execute, Create/Edit/ApplyPatch and Skill to hooks/role-gate.sh under their Claude names, so the skill matrix lives in one place. Skills come from ~/.factory/skills, which room-install links to the room skills. Telemetry is not wired (telemetry.sh would mix these seats into the Claude role logs). Models, autonomy modes and reasoning come from the live session; a seat starts in Auto (Off), read-only, so pick the autonomy level when creating it.",
+        "command": [
+          "@HOME@/.local/bin/droid",
+          "exec",
+          "--output-format",
+          "acp",
+          "--settings",
+          "@HOME@/.paseo/orchestration/droid/seat-settings.json"
+        ],
+        "env": {
+          "ROOM_ROLE": "supervisor",
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "DROID_DISABLE_AUTO_UPDATE": "true",
+          "FACTORY_DROID_AUTO_UPDATE_ENABLED": "false"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 31
+      },
+      "droid-lead": {
+        "extends": "acp",
+        "label": "Droid Lead",
+        "description": "Lead-of-record on Factory Droid (duckling-oci). Paseo MCP on: Droid accepts the daemon's http MCP server and exposes its tools as paseo___*. hooks/notify-on-stop.sh is not wired: it reads Claude Lead transcripts, so a Droid Lead must message the Supervisor itself. Same droid install and Factory login as the droid entry. Role law: under ACP droid ignores --append-system-prompt (verified 2026-10-04), so droid/seat-settings.json, loaded through --settings, runs hooks/inject-profile.sh at SessionStart (startup, resume, clear, compact) and prints roles/$ROOM_ROLE.md into context, the same fallback the Claude seats keep. That is context, not a system prompt. Gate: droid/role-gate.sh denies the delegation only Droid has (missions, automations, Loop, GenerateDroid, settings staging) and hands Task, Execute, Create/Edit/ApplyPatch and Skill to hooks/role-gate.sh under their Claude names, so the skill matrix lives in one place. Skills come from ~/.factory/skills, which room-install links to the room skills. Telemetry is not wired (telemetry.sh would mix these seats into the Claude role logs). Models, autonomy modes and reasoning come from the live session; a seat starts in Auto (Off), read-only, so pick the autonomy level when creating it.",
+        "command": [
+          "@HOME@/.local/bin/droid",
+          "exec",
+          "--output-format",
+          "acp",
+          "--settings",
+          "@HOME@/.paseo/orchestration/droid/seat-settings.json"
+        ],
+        "env": {
+          "ROOM_ROLE": "lead",
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "DROID_DISABLE_AUTO_UPDATE": "true",
+          "FACTORY_DROID_AUTO_UPDATE_ENABLED": "false"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 32
+      },
+      "droid-peer": {
+        "extends": "acp",
+        "label": "Droid Peer",
+        "description": "Peer on Factory Droid (duckling-oci). MCP off, and that is the only barrier: Paseo 0.10.2 never reads daemon.mcp.injectIntoProviders, and disallowedTools does not reach an ACP seat, so with MCP on this seat would receive the Paseo tools. Smoke enforces it. Same droid install and Factory login as the droid entry. Role law: under ACP droid ignores --append-system-prompt (verified 2026-10-04), so droid/seat-settings.json, loaded through --settings, runs hooks/inject-profile.sh at SessionStart (startup, resume, clear, compact) and prints roles/$ROOM_ROLE.md into context, the same fallback the Claude seats keep. That is context, not a system prompt. Gate: droid/role-gate.sh denies the delegation only Droid has (missions, automations, Loop, GenerateDroid, settings staging) and hands Task, Execute, Create/Edit/ApplyPatch and Skill to hooks/role-gate.sh under their Claude names, so the skill matrix lives in one place. Skills come from ~/.factory/skills, which room-install links to the room skills. Telemetry is not wired (telemetry.sh would mix these seats into the Claude role logs). Models, autonomy modes and reasoning come from the live session; a seat starts in Auto (Off), read-only, so pick the autonomy level when creating it.",
+        "command": [
+          "@HOME@/.local/bin/droid",
+          "exec",
+          "--output-format",
+          "acp",
+          "--settings",
+          "@HOME@/.paseo/orchestration/droid/seat-settings.json"
+        ],
+        "env": {
+          "ROOM_ROLE": "peer",
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "DROID_DISABLE_AUTO_UPDATE": "true",
+          "FACTORY_DROID_AUTO_UPDATE_ENABLED": "false"
+        },
+        "params": {
+          "supportsMcpServers": false,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 33
       }
     }
   }
