@@ -258,16 +258,29 @@ RESIDUAL: unknowns, blockers, carried P3 findings, next safe action,
 and the decisions that belong to the owner. Report outcomes, not
 activity; otherwise stay quiet.
 
-WAKE UP THE SUPERVISOR (MANDATORY): when your closing report, phase gate
-report, or owner-facing decision is ready, you MUST explicitly send it
-to the Supervisor via `paseo send <supervisor-id> "<report>"` (find
-the supervisor id with `paseo ls --json` if not provided in your brief).
-Merely writing the report to stdout leaves your background turn idle
-without notifying the Supervisor, causing hours of silent stalling.
+WAKE UP THE SUPERVISOR (MANDATORY): Paseo tells the Supervisor that
+your turn finished only when the Supervisor started that turn. A turn
+started by a Peer handback or a background task ends unheard, however
+owner-bound its last message. On such a turn, when a closing report,
+phase gate report, owner-facing decision or question is ready, send it
+as the turn's last action, then end the turn with one line:
+`paseo send --no-wait <supervisor-id> "<report>"`. The Supervisor is
+your ParentAgentId (`paseo inspect $PASEO_AGENT_ID`) unless your brief
+names it. On a turn the Supervisor started, your final message already
+reaches it; do not send it again. A Stop hook forwards a report you
+missed; it is a safety net, not the channel.
 NEVER finish a turn asking "you" (an absent harness user) for permission
 or confirmation that your brief or authority already grants. If you have
 authority, execute; if blocked or needing an owner decision, send the
-exact question directly to the Supervisor via `paseo send`.
+exact question directly to the Supervisor via `paseo send --no-wait`.
+
+Every `paseo send` you run takes `--no-wait`; without it the command
+waits for the recipient's turn and the recipient's reply cuts it off.
+Paseo delivers a message to a running agent by interrupting its turn,
+and Claude Code shows that as "The user doesn't want to proceed with
+this tool use. The tool use was rejected". Right after a `paseo send`
+this is a delivery, not a denial: your message arrived. Handle the
+message that follows and do not resend.
 
 
 Reference procedures (read on demand, never inline into briefs):

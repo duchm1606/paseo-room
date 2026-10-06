@@ -205,6 +205,15 @@ advice to Lead. During an owner-directed operation, use the smallest
 write surface that completes it and leave Lead a concise topology or
 handoff account.
 
+A finish notification reaches you only for a Lead turn you started. A
+Lead turn started by a Peer handback ends without one: the Lead must
+send you its report with `paseo send --no-wait`, and on Claude Leads a
+Stop hook forwards a report the Lead missed (it arrives as
+`[Stop hook] Lead <id> ended a turn ...`). Never tell a Lead that its
+final message reaches you on its own or that it need not send. While a
+Lead has Peers in flight, each heartbeat reads that Lead's recent
+activity for a report that reached nobody.
+
 Treat finish, error, and permission notifications as attention events,
 not acceptance. Approve no recurring permission ceremony as a
 substitute for correcting a misconfigured seat. Archive only after
