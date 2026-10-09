@@ -382,6 +382,123 @@
           }
         },
         "order": 23
+      },
+      "droid": {
+        "extends": "acp",
+        "label": "Factory Droid",
+        "description": "Mac. Factory Droid 0.237.0 darwin-arm64 at ~/.local/bin/droid (official installer, sha256 verified), which speaks ACP natively through droid exec --output-format acp, so no bridge is needed. Auth is this host's own device-pairing login in ~/.factory, done 2026-10-09 and kept separate from duckling-oci's on purpose: whether Factory rotates refresh tokens is unverified, and a shared auth file would log one host out if it does. Models, autonomy modes and reasoning come from the live session, so this entry declares none. Paseo spawns one droid process per agent, so Factory-AI/factory#46 (session/new inheriting earlier context inside one process) does not apply. Same ACP-seat limits as gemini-peer: no role law, disallowedTools would be silently dropped, and MCP is all-or-nothing through supportsMcpServers. It is off here, which makes this seat Peer-shaped with no Paseo tools. Auto-update is off through env, so the binary changes only when someone reinstalls it.",
+        "command": [
+          "@HOME@/.local/bin/droid",
+          "exec",
+          "--output-format",
+          "acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "DROID_DISABLE_AUTO_UPDATE": "true",
+          "FACTORY_DROID_AUTO_UPDATE_ENABLED": "false"
+        },
+        "params": {
+          "supportsMcpServers": false,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 30
+      },
+      "droid-supervisor": {
+        "extends": "acp",
+        "label": "Droid Supervisor",
+        "description": "Supervisor-of-record on Factory Droid (Mac). Paseo MCP on: Droid accepts the daemon's http MCP server and exposes its tools as paseo___*. Same droid install and Factory login as the droid entry. Role law: under ACP droid ignores --append-system-prompt (verified 2026-10-04), so droid/seat-settings.json, loaded through --settings, runs hooks/inject-profile.sh at SessionStart (startup, resume, clear, compact) and prints roles/$ROOM_ROLE.md into context, the same fallback the Claude seats keep. That is context, not a system prompt. Gate: droid/role-gate.sh denies the delegation only Droid has (missions, automations, Loop, GenerateDroid, settings staging) and hands Task, Execute, Create/Edit/ApplyPatch and Skill to hooks/role-gate.sh under their Claude names, so the skill matrix lives in one place. Skills come from ~/.factory/skills, which room-install links to the room skills. Telemetry is not wired (telemetry.sh would mix these seats into the Claude role logs). Models, autonomy modes and reasoning come from the live session; a seat starts in Auto (Off), read-only, so pick the autonomy level when creating it.",
+        "command": [
+          "@HOME@/.local/bin/droid",
+          "exec",
+          "--output-format",
+          "acp",
+          "--settings",
+          "@HOME@/.paseo/orchestration/droid/seat-settings.json"
+        ],
+        "env": {
+          "ROOM_ROLE": "supervisor",
+          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "DROID_DISABLE_AUTO_UPDATE": "true",
+          "FACTORY_DROID_AUTO_UPDATE_ENABLED": "false"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 31
+      },
+      "droid-lead": {
+        "extends": "acp",
+        "label": "Droid Lead",
+        "description": "Lead-of-record on Factory Droid (Mac). Paseo MCP on: Droid accepts the daemon's http MCP server and exposes its tools as paseo___*. hooks/notify-on-stop.sh is not wired: it reads Claude Lead transcripts, so a Droid Lead must message the Supervisor itself. Same droid install and Factory login as the droid entry. Role law: under ACP droid ignores --append-system-prompt (verified 2026-10-04), so droid/seat-settings.json, loaded through --settings, runs hooks/inject-profile.sh at SessionStart (startup, resume, clear, compact) and prints roles/$ROOM_ROLE.md into context, the same fallback the Claude seats keep. That is context, not a system prompt. Gate: droid/role-gate.sh denies the delegation only Droid has (missions, automations, Loop, GenerateDroid, settings staging) and hands Task, Execute, Create/Edit/ApplyPatch and Skill to hooks/role-gate.sh under their Claude names, so the skill matrix lives in one place. Skills come from ~/.factory/skills, which room-install links to the room skills. Telemetry is not wired (telemetry.sh would mix these seats into the Claude role logs). Models, autonomy modes and reasoning come from the live session; a seat starts in Auto (Off), read-only, so pick the autonomy level when creating it.",
+        "command": [
+          "@HOME@/.local/bin/droid",
+          "exec",
+          "--output-format",
+          "acp",
+          "--settings",
+          "@HOME@/.paseo/orchestration/droid/seat-settings.json"
+        ],
+        "env": {
+          "ROOM_ROLE": "lead",
+          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "DROID_DISABLE_AUTO_UPDATE": "true",
+          "FACTORY_DROID_AUTO_UPDATE_ENABLED": "false"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 32
+      },
+      "droid-peer": {
+        "extends": "acp",
+        "label": "Droid Peer",
+        "description": "Peer on Factory Droid (Mac). MCP off, and that is the only barrier: Paseo injects its MCP into every seat that accepts MCP (daemon.mcp.injectIntoAgents is the only switch), and disallowedTools does not reach an ACP seat, so with MCP on this seat would receive the Paseo tools. Smoke enforces it. Same droid install and Factory login as the droid entry. Role law: under ACP droid ignores --append-system-prompt (verified 2026-10-04), so droid/seat-settings.json, loaded through --settings, runs hooks/inject-profile.sh at SessionStart (startup, resume, clear, compact) and prints roles/$ROOM_ROLE.md into context, the same fallback the Claude seats keep. That is context, not a system prompt. Gate: droid/role-gate.sh denies the delegation only Droid has (missions, automations, Loop, GenerateDroid, settings staging) and hands Task, Execute, Create/Edit/ApplyPatch and Skill to hooks/role-gate.sh under their Claude names, so the skill matrix lives in one place. Skills come from ~/.factory/skills, which room-install links to the room skills. Telemetry is not wired (telemetry.sh would mix these seats into the Claude role logs). Models, autonomy modes and reasoning come from the live session; a seat starts in Auto (Off), read-only, so pick the autonomy level when creating it.",
+        "command": [
+          "@HOME@/.local/bin/droid",
+          "exec",
+          "--output-format",
+          "acp",
+          "--settings",
+          "@HOME@/.paseo/orchestration/droid/seat-settings.json"
+        ],
+        "env": {
+          "ROOM_ROLE": "peer",
+          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "DROID_DISABLE_AUTO_UPDATE": "true",
+          "FACTORY_DROID_AUTO_UPDATE_ENABLED": "false"
+        },
+        "params": {
+          "supportsMcpServers": false,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 33
       }
     }
   }
