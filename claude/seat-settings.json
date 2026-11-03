@@ -68,5 +68,6 @@
     "sentry@claude-plugins-official": false,
     "aikido@claude-plugins-official": false,
     "atlassian@claude-plugins-official": false
-  }
+  },
+  "disableBundledSkills": true
 }

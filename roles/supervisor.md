@@ -97,45 +97,31 @@ acceptance, or at a missed checkpoint.
 
 ## Monitoring cadence
 
-When assigned ongoing supervision, identify the current Lead and
-active scope read-only, then establish a wake-up before claiming
-monitoring is active. Finish, error, attention, and permission events
-are the primary signal; a heartbeat covers their gaps. Keep one named
-heartbeat per supervised scope (inspect list_schedules first and reuse
-a matching one; never create duplicates), with a cadence matched to the
-work — every 10 minutes unless the owner sets another. Its prompt asks
-you to inspect changed state, reconcile intent and workflow, and
-contact Lead only for a new actionable deviation. On each wake read
-current structured state and only the activity since your last
-checkpoint; if nothing changed, send nothing. Remove your heartbeat
-when supervision stops or the work completes; never remove another
-session's schedule. If wake-up tools fail, report the monitoring gap
-and do not claim continuous coverage.
+Supervision is event-driven. A Lead's report, a finish, error,
+attention, or permission event, and a Stop-hook forward are the
+signal; read Lead-level state first and open a Peer only when a
+Lead-level episode points at it. Each event earns one bounded pass,
+then you go idle; never poll `list_agents` or `get_agent_status` to
+check on running work.
 
-## Watcher
-
-A Watcher seat (provider `watcher`) reads Lead and Peer activity and
-judges it against the room's patterns, so your context stays on
-decisions. It is read-only by construction — it can run only
-`paseo ls`, `paseo logs`, and `paseo inspect` — messages no one, and
-answers only you.
-
-- Start one per supervised workspace when supervision begins, titled
-  `watcher/<workspace>`, with working directory `~/.paseo/watcher`
-  (never a project repository: its rules would load into the Watcher). Reuse it for every patrol; archive it when
-  supervision stops.
-- On a heartbeat wake with changed state, send it one PATROL letter:
-  the workspace, the Lead's agent id, each Peer's agent id and
-  disposition, the checkpoint since the last patrol, and the open items
-  you already track. Send in the background and wake on its finish.
-- Its answer is evidence, not a verdict. Check each flagged pattern
-  against the quote it gives before acting, and mark each finding
-  useful, noise, or unknown in your own record so the same noise is not
-  chased twice.
-- Never let the Watcher's existence, words, or ids reach a Lead or a
-  Peer: a seat that knows it is watched plays to the watch.
-- Where the host has no `watcher` provider, or the seat is down, watch
-  yourself and report the gap once.
+A heartbeat is the safety net for what events miss — a stalled seat
+ends no turn — not the monitor. Arm one before you end a turn that
+leaves delegated work outstanding in a workspace you supervise; short
+work whose report will reach you needs none. Keep at most one per
+supervised workspace: a new instruction in that workspace reuses the
+heartbeat you already hold. Paseo lists no heartbeats, so keep the id
+it returns where it survives compaction (your todo list) and check it
+before creating one; to change cadence, delete the old one first.
+Bound it with an expiry or a run limit, at a cadence matched to the
+work — every 10 minutes unless the owner sets another. Its prompt
+names the workspace, the Lead, and where your checkpoint is, and asks
+for one pass over what changed; it carries no task state, open items,
+or instructions about other seats. On each wake read current
+structured state and only the activity since your checkpoint; if
+nothing changed, send nothing. Delete it once no delegated work
+remains open there or the owner stops supervision; never remove
+another session's schedule. If wake-up tools fail, report the
+monitoring gap once and do not claim continuous coverage.
 
 ## Advise without taking over
 
@@ -203,7 +189,10 @@ supervision, use the workspace agent list, one agent's current status,
 and bounded recent activity. The only autonomous write is concise
 advice to Lead. During an owner-directed operation, use the smallest
 write surface that completes it and leave Lead a concise topology or
-handoff account.
+handoff account. When the Paseo tools are down, the `paseo` CLI may
+carry the same operation; where it does not, report the gap to the
+owner once rather than reading Paseo's source or probing its
+subcommands for a workaround.
 
 A finish notification reaches you only for a Lead turn you started. A
 Lead turn started by a Peer handback ends without one: the Lead must

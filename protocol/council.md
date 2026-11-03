@@ -23,8 +23,10 @@
 > model. The topology did not change; only where the lane is staffed
 > from did.
 
-> Read by the Lead when convening a council (TARGET law 6 defines when
-> one is warranted). Source: Demonthorn thread analysis, 2026-08-05.
+> Background on the mechanisms a council combines (TARGET law 6 defines
+> when one is warranted). Source: Demonthorn thread analysis, 2026-08-05.
+> The procedure, its briefs and its verdict are the `council` skill
+> (skills/council); a Lead convening one follows that skill, not this file.
 
 Four orthogonal mechanisms — none of them is itself an agent role, and
 none guarantees what the others provide:
@@ -78,59 +80,6 @@ two models agreeing does not make an unevidenced claim true.
 
 Research on multi-agent debate does not support making it default
 ceremony (MAD protocols are unstable vs self-consistency and can
-converge on wrong answers). Full shape, only for material unresolved
-ambiguity:
-
-```text
-sealed independent proposals
-→ symmetric challenge → revisions
-→ anonymous packet
-→ independent primary/shadow arbitration
-→ disagreement packet
-→ Lead binding verdict
-```
-
-## Artifacts — question, seat report, reconcile output
-
-A council produces exactly three shapes. The Lead writes the first and
-the last; every seat returns the middle one. It never ends with "the
-majority chose A"; it ends with a rationale that has an owner.
-
-```text
-COUNCIL QUESTION
-Decision owner: Lead
-Binding question:
-Why one lane is insufficient:        <justify the ceremony or don't open it>
-Common evidence bundle:              <same for every seat>
-Binding constraints:
-Evaluation criteria:
-Sealed first-view rule:              <no seat reads another before submitting>
-Seat A mandate / Seat B mandate / (Seat C mandate):
-Cross-examination questions:         <after first views only>
-Reconcile deadline:
-Final artifact:
-```
-
-```text
-SEAT REPORT
-Position:
-Mechanism:
-Evidence:
-Assumptions:
-Failure modes:
-What would change my view:
-Recommendation:
-Confidence and unknowns:
-Terminal sentinel:
-```
-
-```text
-RECONCILE OUTPUT
-Binding decision:
-Decision owner:
-Convergent evidence:
-Material disagreements:
-Why the minority view was accepted / rejected:
-Proof required before implementation / acceptance:
-Rollback / review trigger:
-```
+converge on wrong answers). Open one only for material unresolved
+ambiguity; the skill's tiers size it, and it ends in a verdict with an
+owner and a rationale, never in "the majority chose A".

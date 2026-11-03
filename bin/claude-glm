@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Claude Code pointed at Z.ai's Anthropic-compatible endpoint (GLM models).
+# Key lives in ~/.paseo/glm.key (mode 600). Isolated profile so it never
+# touches the operator's ~/.claude login or the role seats' tokens.
+set -euo pipefail
+KEY_FILE="$HOME/.paseo/glm.key"
+[ -s "$KEY_FILE" ] || { echo "claude-glm: $KEY_FILE missing or empty" >&2; exit 3; }
+PROFILE_DIR="$HOME/.claude/profiles/claude-glm"
+mkdir -p "$PROFILE_DIR"
+[ -e "$PROFILE_DIR/.claude.json" ] || printf '{"hasCompletedOnboarding": true}\n' > "$PROFILE_DIR/.claude.json"
+export CLAUDE_CONFIG_DIR="$PROFILE_DIR"
+export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
+export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+export ANTHROPIC_AUTH_TOKEN="$(cat "$KEY_FILE")"
+unset ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN
+export API_TIMEOUT_MS=3000000
+# Claude Code assumes 200K for models it does not recognize; GLM-5.3 has ~1M.
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000
+exec claude "$@"

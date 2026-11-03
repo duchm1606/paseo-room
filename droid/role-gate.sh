@@ -11,14 +11,17 @@ set -euo pipefail
 payload="$(cat)"
 tool="$(jq -r '.tool_name // empty' <<<"$payload")"
 GATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/role-gate.sh"
+TELEMETRY="$(dirname "$GATE")/telemetry.sh"
 
 deny() {
+  { [ -f "$TELEMETRY" ] && ROOM_GATE_HOST=droid bash "$TELEMETRY" deny <<<"$payload"; } >/dev/null 2>&1 || true
   jq -cn --arg reason "$1" \
     '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$reason}}'
   exit 0
 }
 # as <claude-tool>: hand the call to the Claude gate under that tool name.
-as() { jq -c --arg t "$1" '.tool_name = $t' <<<"$payload" | bash "$GATE"; }
+# ROOM_GATE_HOST=droid keeps Claude-seat-only exceptions (OCR delegation) off Droid.
+as() { jq -c --arg t "$1" '.tool_name = $t' <<<"$payload" | ROOM_GATE_HOST=droid bash "$GATE"; }
 
 case "$tool" in
   Task|TaskOutput|TaskStop) as Task ;;
@@ -38,10 +41,10 @@ case "$tool" in
     jq -r '.tool_input.input // empty' <<<"$payload" \
       | sed -n -E 's/^\*\*\* (Add|Update|Delete) File: //p; s/^\*\*\* Move to: //p' \
       | while IFS= read -r path; do
-          out="$(jq -c --arg p "$path" '.tool_name = "Write" | .tool_input = {file_path: $p}' <<<"$payload" | bash "$GATE")"
+          out="$(jq -c --arg p "$path" '.tool_name = "Write" | .tool_input = {file_path: $p}' <<<"$payload" | ROOM_GATE_HOST=droid bash "$GATE")"
           if [ -n "$out" ]; then printf '%s\n' "$out"; exit 0; fi
         done
     ;;
-  Skill) bash "$GATE" <<<"$payload" ;;
+  Skill) ROOM_GATE_HOST=droid bash "$GATE" <<<"$payload" ;;
 esac
 exit 0

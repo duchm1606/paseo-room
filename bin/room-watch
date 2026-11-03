@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# room-watch [-n] <supervisor-id> [every-minutes] [expiry]: start a Watcher
+# on one Supervisor's team, on the owner's demand. Nothing here tells the
+# Supervisor: its law does not mention the Watcher, and the Watcher answers
+# only in its own conversation (roles/watcher.md).
+#
+# One Watcher per Supervisor: a live agent labelled room.watch.supervisor
+# with the same id refuses a second. It is a root agent (never a child of
+# whoever runs this), in the workspace whose directory is ~/.paseo/watcher,
+# created on first use, so agy loads that directory's law and gate. From
+# the Supervisor id it finds the Leads and Peers itself every sweep, and it
+# arms and deletes its own bounded heartbeat. To stop it, tell it to stop
+# (it deletes the heartbeat), then archive it.
+#
+#   -n   print the paseo run command instead of running it
+set -euo pipefail
+
+die() { echo "room-watch: $*" >&2; exit 1; }
+dry=""
+[ "${1:-}" = -n ] && { dry=1; shift; }
+[ $# -ge 1 ] && [ $# -le 3 ] || { echo "usage: room-watch [-n] <supervisor-id> [every-minutes=10] [expiry=8h]" >&2; exit 2; }
+sup="$1" every="${2:-10}" ttl="${3:-8h}"
+dir="$HOME/.paseo/watcher"
+
+[[ "$every" =~ ^[0-9]+$ ]] && [ "$every" -ge 1 ] && [ "$every" -le 59 ] || die "every-minutes must be 1-59"
+[[ "$ttl" =~ ^([0-9]+[smhd])+$ ]] || die "expiry must look like 8h, 90m or 1d"
+[ -f "$dir/AGENTS.md" ] || die "$dir/AGENTS.md is missing; run bin/room-install"
+
+# The run must not inherit a caller: a seat running this would otherwise
+# become the Watcher's parent, and an archive of that seat would cascade.
+unset PASEO_AGENT_ID PASEO_WORKSPACE_ID
+
+info="$(paseo inspect "$sup" --json 2>/dev/null)" || die "no agent $sup"
+id="$(jq -r .Id <<<"$info")"
+[ "$(jq -r .Archived <<<"$info")" = false ] || die "Supervisor $id is archived"
+provider="$(jq -r .Provider <<<"$info")"
+[[ "$provider" =~ (^|-)supervisor$ ]] || die "$id runs provider $provider, not a Supervisor"
+
+live="$(paseo ls -g --label "room.watch.supervisor=$id" --json | jq -r '[.[].id] | join(" ")')"
+[ -z "$live" ] || die "Watcher $live already watches Supervisor $id"
+
+ws="$(paseo workspace ls --json | jq -r --arg d "$dir" '[.[] | select(.cwd == $d)][0].workspaceId // empty')"
+if [ -n "$ws" ]; then place=(--workspace "$ws"); else place=(--new-workspace local); fi
+
+cmd=(paseo run -d --provider watcher --thinking high --title "watch/${id:0:8}"
+  "${place[@]}" --cwd "$dir" --label "room.watch.supervisor=$id" --json
+  "Supervisor: $id. Cadence: every $every minutes. Expiry: $ttl.")
+if [ -n "$dry" ]; then printf '%q ' "${cmd[@]}"; echo; exit 0; fi
+cd "$dir"
+"${cmd[@]}"

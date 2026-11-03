@@ -1,0 +1,6 @@
+{
+  "/home/ubuntu/projects/trustybot-duckling": {
+    "lead": ["ticket-delivery"],
+    "peer": ["browser-harness", "open-code-review:delegate-review"]
+  }
+}

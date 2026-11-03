@@ -6,6 +6,9 @@ fail=0
 die() { printf 'FAIL: %s\n' "$*"; fail=1; }
 
 ROOM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Gate denials below are logged; keep them out of the live telemetry.
+ROOM_TELEMETRY_DIR="$(mktemp -d)"; export ROOM_TELEMETRY_DIR
+trap 'rm -rf "$ROOM_TELEMETRY_DIR"' EXIT
 mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%OLp' "$1"; }  # GNU, then BSD
 CODEX_ROOM="$HOME/.local/bin/codex-room"
 
@@ -19,7 +22,7 @@ bash -n "$ROOM/bin/claude-profile" "$ROOM/bin/claude-lead" "$ROOM/bin/claude-pee
   "$ROOM/bin/claude-supervisor" "$ROOM/bin/claude-seat-token" \
   "$ROOM/bin/room-install" "$ROOM/bin/room-sync" \
   "$ROOM/codex/bin/codex-room" "$ROOM"/hooks/*.sh "$ROOM/watcher/watcher-gate.sh" \
-  "$ROOM/droid/role-gate.sh" \
+  "$ROOM/droid/role-gate.sh" "$ROOM/bin/claude-glm" "$ROOM/bin/pi-feynman" "$ROOM/bin/room-watch" \
   || die "bash -n on launchers/hooks"
 python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$ROOM/codex/bin/codex-room-sync" \
   || die "codex-room-sync does not parse"
@@ -83,8 +86,17 @@ if jq -e '.agents.providers | has("watcher")' "$HOME/.paseo/config.json" >/dev/n
   [ "$(readlink "$w/.agents/watcher-gate.sh")" = "$ROOM/watcher/watcher-gate.sh" ] || die "watcher: gate not linked"
   ! git -C "$w" rev-parse --git-dir >/dev/null 2>&1 || die "watcher: $w is inside a git repository; agy would load its AGENTS.md"
   gate() { jq -cn --arg n "$1" --arg c "$2" '{toolCall:{name:$n,args:{CommandLine:$c}}}' | "$ROOM/watcher/watcher-gate.sh" | jq -r .decision; }
-  [ "$(gate run_command 'paseo logs abc --tail 20')" = allow ] || die "watcher gate blocks paseo logs"
-  for bad in 'paseo send abc hi' 'paseo ls; touch x' 'paseo logs abc -f' "$(printf 'paseo ls\ntouch x')"; do
+  for good in 'paseo logs abc --tail 20' 'paseo ls -g --label paseo.parent-agent-id=abc --json' \
+      "paseo heartbeat create --cron '*/10 * * * *' --name watch/abc --expires-in 8h 'Watcher sweep.'" \
+      'paseo heartbeat delete hb1'; do
+    [ "$(gate run_command "$good")" = allow ] || die "watcher gate blocks: $good"
+  done
+  for bad in 'paseo send abc hi' "paseo send abc 'hi'" 'paseo ls; touch x' 'paseo logs abc -f' \
+      "$(printf 'paseo ls\ntouch x')" \
+      "paseo heartbeat create --cron '*/10 * * * *' 'Watcher sweep.'" \
+      "paseo heartbeat create --cron '*/10 * * * *' 'x --expires-in 8h'" \
+      "paseo heartbeat create --expires-in 8h \"\$(touch x)\"" \
+      "paseo heartbeat create --expires-in 8h 'a'; touch x"; do
     [ "$(gate run_command "$bad")" = deny ] || die "watcher gate allows: $bad"
   done
   [ "$(gate view_file '')" = deny ] || die "watcher gate allows view_file"
@@ -107,6 +119,15 @@ unfenced="$(jq -r '.agents.providers | to_entries[]
            else ((.value.disallowedTools // []) | index("mcp__paseo")) == null end)
   | .key' "$HOME/.paseo/config.json")"
 [ -z "$unfenced" ] || die "Peer-shaped seats with no barrier against the Paseo MCP: $(echo $unfenced)"
+# Pi seats read neither disallowedTools nor supportsMcpServers. Paseo hands a
+# Pi seat its MCP only when the pi-mcp-adapter extension is installed
+# (PiRpcAgentClient.prepareMcpConfig, read 2026-10-12), so that absence is
+# their barrier.
+if jq -e '[.agents.providers[] | select(.extends == "pi" and .enabled != false)] | length > 0' \
+     "$HOME/.paseo/config.json" >/dev/null \
+   && grep -qs 'pi-mcp-adapter' "$HOME/.pi/agent/settings.json"; then
+  die "pi-mcp-adapter is installed in ~/.pi/agent: Pi seats would receive the Paseo MCP"
+fi
 
 # 4b'''. Droid seats: law and gate come from droid/seat-settings.json through
 #        --settings, skills from ~/.factory/skills, and the gate denies what it
@@ -134,12 +155,47 @@ if [ -n "$droid_seats" ]; then
     IFS='|' read -r r t i <<<"$c"
     [ "$(dgate "$r" "$t" "$i")" = deny ] || die "droid gate allows $t for $r"
   done
-  for c in "peer|Execute|{\"command\":\"echo hi\"}" "peer|Skill|{\"skill\":\"tdd\"}" \
+  for c in "peer|Execute|{\"command\":\"echo hi\"}" "peer|Skill|{\"skill\":\"browser-harness\"}" \
            "lead|Skill|{\"skill\":\"triple-review\"}" "peer|ApplyPatch|{\"input\":\"*** Begin Patch\\n*** Add File: /tmp/x\\n*** End Patch\\n\"}"; do
     IFS='|' read -r r t i <<<"$c"
     [ "$(dgate "$r" "$t" "$i")" = allow ] || die "droid gate blocks $t for $r"
   done
 fi
+
+# 4b'''. Skill matrix (hooks/role-gate.sh): each role reaches what its work
+#        needs and nothing that schedules outside Paseo or writes config, and
+#        every denial lands in telemetry.
+cgate() { # cgate <role> <skill> -> allow|deny
+  local out
+  out="$(jq -cn --arg s "$2" '{tool_name:"Skill", tool_input:{skill:$s}, session_id:"smoke"}' \
+    | ROOM_ROLE="$1" bash "$ROOM/hooks/role-gate.sh")"
+  if [ -z "$out" ]; then echo allow; else jq -r '.hookSpecificOutput.permissionDecision' <<<"$out"; fi
+}
+for c in peer:browser-harness peer:test-proof-debt-audit peer:research lead:repo-refresh \
+         lead:triple-review lead:council supervisor:grilling \
+         supervisor:architecture-premise-audit supervisor:test-proof-debt-audit; do
+  [ "$(cgate "${c%%:*}" "${c#*:}")" = allow ] || die "role gate blocks ${c#*:} for ${c%%:*}"
+done
+for c in supervisor:loop supervisor:schedule supervisor:init supervisor:update-config \
+         supervisor:fewer-permission-prompts supervisor:keybindings-help supervisor:claude-api \
+         supervisor:paseo-supervisor lead:research lead:browser-harness peer:repo-refresh \
+         peer:frontend-design peer:agent-browser peer:simplify peer:tdd lead:code-review \
+         lead:grilling peer:council supervisor:council lead:dual-review; do
+  [ "$(cgate "${c%%:*}" "${c#*:}")" = deny ] || die "role gate allows ${c#*:} for ${c%%:*}"
+done
+jq -e 'select(.event == "deny" and .skill == "tdd" and .session == "smoke")' \
+  "$ROOM_TELEMETRY_DIR/peer.jsonl" >/dev/null 2>&1 || die "role gate denial not logged to telemetry"
+jq -cn '{tool_name:"Skill", tool_input:{skill:"agent-browser"}}' | ROOM_ROLE=peer bash "$ROOM/hooks/role-gate.sh" \
+  | grep -q "Use the browser-harness skill" || die "role gate does not redirect agent-browser to browser-harness"
+# Claude seats list no Claude Code built-ins: the room skills are the whole set.
+jq -e '.disableBundledSkills == true' "$ROOM/claude/seat-settings.json" >/dev/null \
+  || die "claude/seat-settings.json must set disableBundledSkills"
+for role in lead peer supervisor; do
+  f="$HOME/.claude/profiles/claude-$role/settings.json"
+  [ -f "$f" ] || continue
+  jq -e '.disableBundledSkills == true' "$f" >/dev/null 2>&1 \
+    || die "claude-$role: disableBundledSkills not installed (run bin/room-install)"
+done
 
 # 4c. Room skills are well-formed: one SKILL.md per directory, named after it.
 for d in "$ROOM"/skills/*/; do

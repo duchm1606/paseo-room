@@ -188,7 +188,7 @@ enforcement surface is a slogan.
 | Neutral briefs / anti-option-menu | workspace-protocol.template.md "Brief discipline" | check per-repo WORKSPACE_PROTOCOL.md exists and carries it |
 | Escalation + reconcile + verdict vocab | lead.md, peer.md, protocol/states.md, handback.md | read profiles/protocol |
 | Assignment envelope carries stop condition, active-owner check, mutation vs external-effect split, acceptance owner | protocol/context-pack.md skeleton | read a live brief: the four lines are present or collapsed, never absent |
-| Council ends in an owned rationale, not a majority | protocol/council.md artifacts (question / seat report / reconcile) | reconcile output names why the minority view was rejected |
+| Council ends in an owned rationale, not a majority | skills/council (neutral brief, sealed reports, Lead-drafted verdict) | the verdict answers material dissent with evidence |
 | Layered status; one PASS never covers an untested layer | lead.md CLOSING REPORT; protocol/lead-operations.md | closing reports show SOURCE/ARTIFACT/INSTALLED/LIVE/RESIDUAL verdicts |
 | Supervisor intervention = attention packet | supervisor.md "Advise without taking over" | a message to Lead carries evidence + unknown + open question, no command |
 | Handoff ≠ handback; break-before-make on owner change | protocol/handoff.md (packet + Lead replacement receipt); lead.md CADENCE; supervisor.md ops | a Lead replacement leaves a receipt in the notebook; no two seats `working` on one scope |

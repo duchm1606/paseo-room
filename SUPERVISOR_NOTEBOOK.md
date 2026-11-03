@@ -28,6 +28,67 @@ one; the notebook records durable learning, not a transcript.
 
 ## Log
 
+## 2026-10-15 — Owner correction: cancellation event is not proof of owner intent
+
+- What I said: I told the owner I had stopped AISDLC-164 bootstrap following their cancellation action.
+- Owner correction: The owner states they did not cancel and asks what was cancelled.
+- Evidence: This session received a cancelled `paseo___create_agent` tool result, followed by messages labelled "Request cancelled by user" and "Request interrupted by user". These events establish interruption, not who initiated it or why.
+- Correction: Report the runtime interruption without attributing intent to the owner. No new Lead, Peers or heartbeat were created. The cause of the interruption remains unknown.
+- Investigation follow-up (2026-10-15): The runtime and installed Paseo code identify automatic finish-notification preemption, not an owner cancellation or permission denial. Droid logs show the old Lead completing at 07:09:21.334Z, the Supervisor receiving `droid.interrupt_session` at 07:09:21.345Z, and its pending tool being cancelled at 07:09:21.347Z. Supervisor session `0b74e70a-cf17-4d20-bdcb-a82c9c64f3d6` then persists the old Lead's finish envelope at 07:09:21.410Z.
+- Mechanism evidence: Installed `@getpaseo/server/dist/server/server/agent/agent-prompt.js:280-285` sends finish notifications with `activeTurnBehavior: "steer"`; `agent-manager.js:1828-1858,1901-1909` falls back to cancelling and replacing the foreground turn when steering is unavailable. The configured `droid-supervisor` extends ACP; its installed ACP session has no `steerActiveTurn`, and `providers/acp-agent.js:1584-1594` sends cancellation on interrupt.
+- Configuration checks: Session autonomy was `auto-high`; the role hook matcher excludes the Paseo create-agent tool; permission cleanup logged zero pending requests. `auto_accept=false` was present but is not evidence of the cause here. No runtime configuration was changed, no reproduction was run, and no daemon was restarted.
+- Recommendation: Queue nonurgent system notifications for a safe turn boundary when a provider cannot steer, rather than cancelling the active operation. Preserve real owner stop semantics. Separately, do not interpret Droid's generic cancellation labels as proof of owner intent.
+
+## 2026-10-15 — Owner correction: Supervisor received the report but delayed the owner-facing summary
+
+- What I said: After AISDLC-164 research finished, I emphasized two missed
+  Peer-to-Lead finish events, then handled closure and asked for next-step
+  authority without first delivering a clear, concise research summary.
+- Owner correction: The owner asked why nobody had reported and why the room
+  was idle, then asked whether I had failed to receive the Lead's result.
+- Evidence: Lead `c2060eb2-09eb-492f-9146-1602a7d5d2c3` sent the full
+  Vietnamese report to Supervisor `848862f2-6e77-4545-b235-61064dd0e736`
+  and a finish notification. Both were received in this conversation.
+  Supervisor subsequently acknowledged closure; the owner-facing summary
+  arrived only after the owner's status question.
+- Correction: The Peer-to-Lead delivery failures are real but do not explain
+  this separate Supervisor-to-owner reporting failure. State that I received
+  the report. Deliver outcome, limits and next decision before lifecycle
+  cleanup or questionnaires; do not let acknowledgments substitute for the
+  owner's report.
+- Impact: The owner could not distinguish completed research awaiting scope
+  authorization from stalled work. Idle did not mean implementation failed.
+- Current mandate: Owner now authorizes obtaining document-extractor and
+  reading its code. This does not itself authorize a fix, Jira writes,
+  deployment or queue recovery.
+
+## 2026-10-15 — agy executable availability does not establish authentication
+
+- Observation: Owner reported Gemini/agy unavailable. Paseo listed the Gemini providers as available, but local agy 1.3.5 rejected model discovery with "Please sign in to view available models."
+- Evidence: `agy --version` and `agy models` during this recovery; `/home/ubuntu/.gemini/antigravity-cli/log/cli-20261015_045123.log` also reports "You are not logged into Antigravity."
+- Unknown: Why the prior login stopped being recognized; expiry or revocation has not been established.
+- Recovery / authority: Owner requested diagnosis and authentication if needed. Opened the native Google OAuth login in terminal `agy-auth-recovery`, outside project repositories. No project work, seat replacement, or daemon changes.
+- Outcome: Awaiting owner authentication. The new flow uses PKCE, so an authorization code from another flow cannot be assumed usable. No credentials or login URLs recorded here.
+- Recommendation: Distinguish provider discovery from authenticated model availability; verify model discovery after login before claiming recovery.
+- Recovery follow-up, 2026-10-15 04:58 UTC: Submitted the owner's fresh code to the pending native OAuth flow. `agy models` then exited 0 and returned six models, including Gemini 3.8 Flash high/medium/low. Authentication and model discovery recovered; no agent inference or end-to-end Paseo turn was tested. No credentials recorded.
+
+## 2026-10-06 — Owner correction: Lead finish delivery depends on turn origin
+
+- What I said: I told Lead dc374a64-4d28-4cc9-ac42-41bf9b25869d that its final report reached Supervisor through Paseo finish notifications and that it need not retry `paseo send` for the receipt.
+- Owner correction: The owner's separate Claude session reported that finish notifications reached me for turns I opened, not turns opened by Peer handbacks; 14 such turns since 2026-10-05 were missed, including onboarding, Nest, and music reports. My replies interrupted two initial sends, which appeared as rejected tool uses.
+- Impact: My delivery guidance encouraged reliance on an incomplete notification path and left owner-facing results undelivered.
+- Reported repair (not independently verified here): Lead now sends upward with `paseo send --no-wait`; a Stop hook forwards missed reports; role files and WORKSPACE_PROTOCOL v15 document the change.
+- Correction: Do not tell Lead that final responses always reach Supervisor or that upward sends are unnecessary. On heartbeat wakes while Peers are active, inspect bounded recent Lead activity for undelivered reports. Do not claim continuous coverage without an established wake-up.
+- Owner requested this notice be recorded without messaging Lead or reporting back to the owner.
+
+## 2026-10-05 — Owner correction: reply to Lead, not only to owner
+
+- Observation: I summarized Lead dc374a64-4d28-4cc9-ac42-41bf9b25869d's onboarding planning checkpoint to the owner without replying to the Lead in that turn.
+- Owner correction: "Ủa không paseo send lại hả lead?"
+- Impact: The owner-facing summary did not close the Supervisor-to-Lead communication loop.
+- Recovery: Sent a Paseo reply to the Lead preserving the planning-only scope and requesting the plan through Supervisor; no implementation approval was given.
+- Recommendation: Answer a substantive Lead message in the turn it is read, rather than treating an owner-facing summary as that reply.
+
 ## Supervisor seat becomes the command channel (convener + contract author + plan acceptor)
 
 - Observation: On `wks_3cc39ad0f066f9c2` (pptx layout-fill+refine sealed council,
@@ -6345,3 +6406,321 @@ asked.
 - The disk hit 99% and a review lane failed with ENOSPC. Causes: one worktree per branch at about 1.5 GB each (res/ is tracked), never removed after landing; /tmp review copies (one engine lane left 48 GB in /tmp/rv-eng); orphaned vite dev servers left by Engineers whose handbacks claimed they were stopped.
 - Fix: each Lead removed its own merged and clean worktrees (branches kept, ignored screenshots backed up to ~/wyrm-screenshots/) and its seats' /tmp copies. Usage went from 99% to 34%.
 - Pattern: Leads should remove a worktree once its branch lands, and review lanes should delete their /tmp copies at handback.
+
+- 2026-10-04 (telcoad-tkcsdl-review): I told the owner that Lead staging one mapping Peer before the other three was reasonable. The owner corrected this: spawn all owner-named Peers in parallel at once, no blocking waits, and Peers hand back via `paseo send` (use `--no-wait` so the sender does not block).
+
+- 2026-10-05 (telcoad-tkcsdl-review, Lead e232a8cb droid-lead): pattern "Peer finish lost after error re-prompt". Peer 569da077 errored at 04:17:10Z; Lead re-prompted it at 04:17:36Z; the Peer finished at 04:24:04Z but no finish notification reached the Lead, which stayed idle until the owner asked "Lead có đang làm gì đâu?" and the Supervisor nudged it (04:25:46Z). The Lead confirmed it never got the notice. Mitigation: on any Peer error/re-prompt, treat the next finish as unobserved and check that Peer's status on the next heartbeat; candidate fix is for Peers to `paseo send --no-wait` their parent at handback.
+- 2026-10-05 (same workspace, repeat): same lost-wake, different trigger. Lead e232a8cb sent a repair to Engineer 134cb1b4 via CLI `paseo send` at 04:45:20Z; the Engineer finished at 04:45:57Z while the Lead turn was still open (ended 04:46:05Z). The Lead's last words said it would re-check "when the Engineer finishes" and it stayed idle until the Supervisor nudged it at 04:50Z. Rule of thumb: a Peer finish that lands inside the Lead's own open turn never wakes the Lead. The heartbeat check is the only thing that catches it.
+- 2026-10-15 (AISDLC-164, related lost-wake candidate): At the 05:00Z heartbeat, Sonnet `45077fca-d123-40f4-8538-59581342dd64` had finished at `04:55:44.753Z` with an actual six-part `PARTIAL` research handback (activity count 54), but Lead `c2060eb2-09eb-492f-9146-1602a7d5d2c3` was idle with activity count 30, last updated `04:59:53.557Z`, still saying both Peers were researching. No handback or disposition appeared in the inspected Lead activity. Notification loss is a hypothesis, not yet confirmed; no re-prompt/error trigger was observed. Supervisor sent one evidence-backed question asking Lead's disposition and suggesting retrieval of the actual final if delivery failed. Open: inspect the Lead's disposition and any requested Peer repair before research closeout; an acknowledgment alone does not close this item. No implementation acceptance or topology replacement was performed.
+  - Follow-up at `05:01:04.191Z`, Lead activity count 44: Lead explicitly reported “Its finish event never reached my session” and retrieved the actual Sonnet final, then recorded “ACCEPT as research evidence” with runtime claims pending Argon. The missing receipt/disposition link is repaired; transport cause remains uninvestigated. The finish notification contained only “Plan is up-to-date,” so bounded activity inspection was necessary to see the substantive disposition.
+  - Repeat discovered on the owner's status question: Argon `ad660761-26c1-4f4e-8303-a448d9b83495` completed its actual six-part handback (activity count 84) and became idle at `05:00:53.021Z`; Lead activity count 49, updated `05:02:04.451Z`, still said Argon was running. Supervisor sent a second episode-specific attention packet asking for Argon disposition and synthesis from the available handback. This supports a repeated lost-wake symptom, not a diagnosed transport cause. Argon disposition and combined report remain open; no engineering ownership was transferred.
+  - Separate open evidence-boundary item from that disposition: Lead accepted “The original message was kept in the dead queue and could be replayed later,” while the actual Peer handback says it did not open the queue. Supervisor asked what supports current retention/recoverability rather than expected code behavior, suggesting qualification in the synthesis without additional access. Next checkpoint: inspect the reconciled report for explicit observed-versus-inferred treatment. No technical conclusion or recovery operation was imposed.
+
+- 2026-10-05 wyrmspire (supervisor fc08d4a2): Lead 64075387, C2 Engineer 349f84ef and Reviewer 34cde724 all stopped mid-turn at ~06:37 UTC with no report, and the room sat idle ~3.5 h until the owner asked. Every seat was "idle", so no attention event fired. Pattern candidate: a simultaneous mid-turn stop looks like a normal idle; with no heartbeat it goes unnoticed. Owner decision framing: I recommended "accept the win-rate rise, one balance pass after C3"; the owner's answer was different: deprioritize win rate entirely and focus on gameplay, adjusting difficulty after people play. Don't presume a scheduled balance pass.
+
+## 2026-10-14: Project-local workflow files do not establish seat capability
+
+- Observation: During owner-authorized trustybot-duckling protocol/skill setup,
+  project-local skill discovery, role-gate permission and MCP authentication
+  proved to be separate activation requirements.
+- Evidence: Direct non-executing payload tests of `hooks/role-gate.sh` denied
+  Lead `ticket-delivery` and `dual-review`, Peer `browser-harness`, and Peer
+  `ocr --help`. The OCR denial still named removed provider `codex-review`.
+  The operator's `.claude.json` registered Jira only for this workspace, while
+  inspected isolated Lead/Peer profiles had no such registration. No live
+  Jira/OpenObserve tool access was verified.
+- Impact: Copying a skill or setting bypassPermissions alone would falsely
+  claim delivery readiness and create permission loops at first dispatch.
+- Pattern status: First recorded occurrence of workspace-local activation
+  mismatch here. Not evidence of a Lead workflow failure.
+- Intervention and lease: Owner requested workspace protocol, local delivery
+  skill adaptation and MCP application. Installed project-local documents and
+  skills, preserved OpenObserve while registering credential-free Atlassian
+  endpoint in project MCP configuration. No shared gate/profile changes, seat
+  launches, project validation or external writes.
+- Recommendation: Qualify discovery, gate, plugin behavior and profile auth
+  separately. A future gate exception must bind exact workspace and role,
+  preserve outside-workspace denials and prohibit hidden plugin delegation.
+- Human decision needed: Shared live gate/plugin activation scope. Local
+  artifacts explicitly remain runtime-blocked; details are handed back in
+  `trustybot-duckling/WORKSPACE_SETUP.md`.
+
+- 2026-10-14 owner correction: I described the workspace-only pilot as keeping
+  the original gate, but it used base `claude` plus a local hook that skipped
+  the original gate for new skill exceptions. The owner challenged why that
+  alternate launch layer existed. I clarified that it did not override the
+  original orchestration and proposed removing it. The owner approved removal
+  and an exact-workspace grant in the original gate instead. Correction:
+  preserve the original provider/profile/auth/enforcement path when extending
+  it; do not equate untouched shared files with unchanged enforcement.
+  Removed the pilot layer, retained project skills/reports/MCP, and added
+  owner-controlled original-gate grants for this launch root only. OCR remains
+  blocked pending separate qualification. No project acceptance or ticket work
+  was delegated.
+- 2026-10-14 owner correction, same setup episode: I added a separate setup
+  document and made it required reading even though the owner requested a
+  workspace protocol, not another coordination artifact. The owner questioned
+  that layer and approved its removal. Deleted the extra document and its
+  mandatory references; retained only the short unresolved activation limits
+  in the existing protocol. Setup receipts belong in the handback, not another
+  standing prerequisite.
+
+## 2026-10-15 — Paseo creation schema drift during AISDLC-164 bootstrap
+
+- Observation: The exposed `create_agent` MCP schema did not match the
+  operation accepted by the daemon. Separate provider/model was rejected;
+  the repaired combined provider/model then failed on missing `relationship`
+  and `workspace` objects and unrecognized `workspaceId`/`cwd`.
+- Evidence: Supervisor `848862f2-6e77-4545-b235-61064dd0e736`, two creation
+  errors immediately before the successful CLI launch at
+  `2026-10-15T04:50:57.431Z`; resulting Lead
+  `c2060eb2-09eb-492f-9146-1602a7d5d2c3`.
+- Suspected mechanism: MCP public schema and internal creation request have
+  drifted. Exact integration defect was not investigated.
+- Impact: Two failed bootstrap calls. The supported `paseo run --help` route
+  allowed the authorized seat launch without modifying the integration.
+- Recovery / authority: Owner explicitly requested Opus hosting AISDLC-164
+  research with Argon and Sonnet Peers. Used CLI launch, preserved Lead-owned
+  Peer assignment, and kept product/Jira writes outside scope.
+- Additional boundary: CLI `--mode auto-high` left `auto_accept=false`,
+  verified by structured Lead status. Applied `update_agent` with
+  `settings.features.auto_accept=true`; success returned. Notified Lead of
+  this topology/configuration account and the working setting surface.
+- Pattern status: First recorded creation-schema episode.
+- Recommendation: Repair the owning deterministic MCP integration only under
+  a separate owner mandate, rather than adding project launch conventions.
+- Human decision needed: None for research bootstrap; integration repair is
+  not part of this assignment.
+
+## 2026-10-15 — Watcher authentication gap, AISDLC-164
+
+- Observation / evidence: Watcher `9d6d87da-71a1-4659-bbab-ffc5008d2415`
+  entered error at `2026-10-15T04:52:24.864Z`; structured status reports
+  authentication required and timeout. Its model catalog had returned empty.
+- Unknown: Why the prior provider authentication was unavailable; no
+  credential inspection, login, or configuration repair was attempted.
+- Impact / response: Automated Watcher coverage is unavailable. Supervisor
+  `848862f2-6e77-4545-b235-61064dd0e736` retains direct bounded observation
+  using the active ten-minute heartbeat `f5ab83b4`. Reported the gap to owner
+  once; no Watcher details were sent to Lead or Peers.
+- Pattern status: First recorded Watcher authentication episode here.
+- Human decision needed: None for continued direct supervision. Authentication
+  recovery is outside the current research bootstrap.
+
+## 2026-10-15 — Watcher identity discoverable by the supervised Lead
+
+- Observation: AISDLC-164 Lead independently named the private observation
+  seat in its startup receipt; Supervisor had not disclosed it in the brief.
+- Evidence: Lead `24a10d44-e704-4067-ae34-c0ccad98ebb5`, startup receipt
+  received around 07:30 UTC: "Ghi chú: thấy một agent watcher/AISDLC-164
+  (216aa90) không do Lead tạo; Lead không tương tác với nó."
+  Its subsequent finish report repeated the observation.
+- Suspected mechanism: Shared agent discovery may expose descriptive titles
+  across workspaces. The exact discovery path and visibility controls were
+  not investigated under this research-supervision assignment.
+- Impact / limits: The intended observation confidentiality did not hold.
+  There is no evidence that awareness changed Lead or Peer behavior.
+- Intervention: Supervisor did not confirm, explain or discuss the observation
+  seat with Lead or Peers. No topology, profile or integration change.
+- Pattern status: First recorded identity-discovery episode.
+- Recommendation: If the owner requests a governance repair, examine the
+  owning discovery/visibility surface rather than telling seats to ignore
+  observable monitoring metadata.
+- Human decision needed: None for the ongoing investigation; changing
+  discovery policy requires a separate owner mandate.
+- Patrol assessment: The initial report from
+  `216aa907-b895-4ec0-b262-9860c0e4db0d` was useful for closing the startup
+  receipt open item. Its quoted receipt matches the message actually received.
+  No actionable coordination deviation was established by that patrol.
+- Owner correction, 2026-10-15: I placed the Watcher in a separate workspace.
+  The owner directed that it belong to the supervised workspace while keeping
+  its cwd outside the project, and supplied the updated role-law placement.
+  Under that watcher-only lease, archived idle Watcher
+  `216aa907-b895-4ec0-b262-9860c0e4db0d` at 07:48:22Z and created
+  `19f190b1-3977-458c-ae37-ab745118e087`. Structured status verified provider
+  `watcher`, workspace `wks_97d0a1fe6ec483b0`, cwd
+  `/home/ubuntu/.paseo/watcher`. Heartbeat `68a110bc`, Lead and Peers were
+  unchanged; no Watcher message was sent to Lead or Peers. This corrects
+  placement, not the separate unverified discovery-visibility hypothesis.
+- Publication-phase fallback, 2026-10-15 around 11:13Z: Paseo MCP was
+  disconnected, so Supervisor used the supported CLI. `paseo run --workspace
+  wks_97d0a1fe6ec483b0 --cwd /home/ubuntu/.paseo/watcher` silently used the
+  project cwd instead. Structured inspect confirmed this for
+  `bc7166ac-eb08-40ae-9062-8b6f86604f24`; Supervisor stopped and archived that
+  seat, then used the role-law separate-workspace fallback. Replacement
+  `16ebab60-3399-4248-98d8-562972b90f99` has provider `watcher`, high thinking,
+  cwd `/home/ubuntu/.paseo/watcher`, and newly created fallback workspace
+  `wks_1d33ebd4e466d24f`. The owner was notified once; Lead/Peers were not.
+  This is an observed CLI placement limitation, not a claim about the
+  compatibility fields accepted by the unavailable MCP tool.
+- CLI heartbeat discovery limitation in the same phase: heartbeat creation
+  succeeded as `a9bf389d`, but `schedule ls` returned empty and
+  `schedule inspect` reported not found. Updating that exact heartbeat through
+  `heartbeat update` with its unchanged cadence returned active, targeting
+  this Supervisor, next run 11:20Z. No duplicate was created. The difference
+  between schedule and heartbeat CLI surfaces remains uninvestigated.
+
+## 2026-10-15 — Invented-citation recurrence caught in Lead reconciliation
+
+- Observation: AISDLC-164 Argon
+  `1c7d4e7f-53de-47fc-bd9b-73a9d8565be4` returned confident source quotations
+  and exact measurements that Lead explicitly rejected after checking.
+- Evidence: Argon's first full handback (activity 179/185 window, read after
+  Lead checkpoint 2) states `257` characters, JSON fields as `TEXT`,
+  an ORM `String(255)`, and `/kb/v1/upload-document`. The subsequent actual
+  Lead-to-Peer disposition in that same timeline says `PARTIAL ACCEPT`,
+  corrects length to `272` characters / `333` bytes, identifies JSONB, and
+  rejects the quoted ORM definition and nonexistent route. Lead
+  `24a10d44-e704-4067-ae34-c0ccad98ebb5` separately reported those corrections
+  to Supervisor. Supervisor inspected both messages, not project code.
+- Mechanism / limits: Reconstructed source detail is a hypothesis; no claim
+  is made about the model's internal cause. Agreement on the main causal
+  chain did not establish reliability of the supporting quotations.
+- Impact: Unsupported details could have entered the final root-cause
+  report. Lead's reconciliation caught them before final acceptance.
+- Pattern status: Repeat of `invented-citation`, now in a research handback.
+- Disposition: First handback explicitly partially rejected; follow-up
+  restricted to runtime evidence with exact SQL and raw counts. The browser
+  versus API-client origin remains open for both lanes, not accepted fact.
+- Supervisor intervention: None beyond recording the provisional outcome
+  and scope. Lead had already performed the needed repair; another warning
+  would duplicate it.
+- Next checkpoint: Inspect repaired Argon handback and final Lead disposition.
+  This episode is not closed merely because Argon acknowledged the correction.
+- Human decision needed: None at this checkpoint.
+- Closure: Supervisor inspected Argon's actual round-2 handback (activity
+  snapshot 270) and Lead's final report. The revised report supplies bounded
+  SQL/counts and explicitly finds no request metadata in the incident window;
+  Lead accepts round 2 while retaining the round-1 source-detail rejection.
+  The communication repair is closed, not a blanket acceptance of Argon's
+  original report. Supervisor did not rerun product evidence.
+- Material recurrence during the owner-authorized Argon trial fix: Lead
+  rejected a fixture comment/report claiming an invented filename was the
+  incident filename. Argon's repaired handback (activity snapshot 627) states
+  that its earlier fixture name and identifiers were invented inline, not
+  copied from runtime data. That provenance remains the author's account,
+  not independent proof of origin. Lead required clearly synthetic fixtures,
+  corrected attribution and new tests, then accepted local candidate
+  `a9196094904158ecc1a7f4dbf9eeaf7a7a318247` after independently checking
+  71 passing tests, failure on base, and absence of the old fixture strings.
+  Supervisor inspected the repaired response and Lead's disposition, closing
+  this communication repair without claiming product acceptance.
+- Trial-run reporting boundary: Owner received the distinction between real
+  isolated PDF/chunk/Postgres/Qdrant/Redis/RabbitMQ execution reported by Argon
+  and stubbed S3/R2, Elasticsearch and embedding. Lead directly checked the
+  production diff and targeted tests, not the extraction run itself. No live
+  deployment or shared-environment acceptance was inferred. The trial ended
+  with branch/worktree retained, heartbeat removed and its idle observation
+  seat archived.
+
+## 2026-10-15 — Broad metadata follow-up incurs reported search cost
+
+- Observation: AISDLC-164 Argon round 2 continued full-retention searches
+  while the unresolved question was attribution of one upload incident.
+- Evidence: Peer `1c7d4e7f-53de-47fc-bd9b-73a9d8565be4`, activity snapshot
+  updateCount 254 after the 08:10Z heartbeat, reported "running three
+  intensive, full-retention queries concurrently overloaded OpenObserve's
+  search workers" and "a recent scan size of 55 GB for a simple string
+  match", with subsequent SearchSQL activity. Supervisor inspected these
+  actual entries after the patrol highlighted the first quote.
+- Limits: These are the Peer's statements, not independently checked service
+  metrics. Search-worker overload and the scan-size mechanism remain unknown.
+- Suspected mechanism: A broad historical-correlation assignment may have
+  outgrown the remaining incident-attribution uncertainty.
+- Impact: Delayed handback and potentially unnecessary shared search load.
+- Intervention: One attention question to Lead
+  `24a10d44-e704-4067-ae34-c0ccad98ebb5` asking for a bounded query scope or
+  stopping criterion, with existing evidence plus an explicit metadata limit
+  as the smallest suggestion. No direct Peer instruction or product work.
+- Pattern status: First observed costly-query episode in this workstream.
+- Patrol assessment: Useful signal, despite the patrol's "NOTHING NOTABLE"
+  summary. The quoted observations warranted a bounded Lead question, not
+  acceptance of the patrol verdict or of its overload claim.
+- Next checkpoint: Lead disposition and actual bounded handback; still open.
+- Human decision needed: None; investigation scope management belongs to Lead.
+- Closure: Lead's actual ruling reached Argon (activity snapshot 255):
+  drop historical questions, restrict to 02:28–02:35 UTC, at most six narrow
+  calls, then return a metadata limit if necessary. Argon's actual final
+  handback (snapshot 270) reports five bounded queries, 140 MB scan size per
+  query, and no request metadata. It accounts for eleven prior broad-query
+  attempts, including two approximately 55 GB scans and five timeouts.
+  Lead's final report accepts the bounded handback and keeps overload as
+  unverified Peer reporting. The scoped-query repair is closed.
+
+## 2026-10-15 — Existing test isolation defect obscured a new failing test
+
+- Observation: AISDLC-164 Reviewer B reported one added full-suite test
+  failure, but Lead initially summarized its cause as pre-existing without
+  preserving that candidate-specific consequence.
+- Evidence: Reviewer `84f523dd-ec5c-43da-8642-31f15ab4c9e7` said "It is
+  the only failure the head has that the base doesn't in a full-suite run."
+  Lead's first handback called the stub conflict pre-existing and reported
+  its own reproduction timed out. Supervisor read both actual responses
+  and asked one question about this discrepancy, without rerunning tests.
+- Mechanism / impact: A pre-existing root cause and an added failing test
+  were collapsed into one classification, obscuring the PR's test impact.
+  Separately, the reviewer said import-time environment mutation makes
+  base/head aggregate failure counts incomparable.
+- Repair: Lead explicitly accepted the reviewer's evidence, distinguished
+  the four already-failing tests from the PR's added failing test, and stated
+  that its timeout was inconclusive, not contradictory evidence. It retained
+  P3 severity for production impact but changed the recommendation to fixing
+  both test issues before merge.
+- Outcome: The report discrepancy is closed; remediation is not complete.
+  Sonnet's one-lane contract review remains accepted by Lead. OCR lane is
+  blocked; an owner decision is still needed on its replacement/qualification
+  and on a test-only repair under the review-only assignment.
+- Pattern status: First recorded instance in this workstream.
+- Patrol assessment: Review startup/neutral-brief observations were useful
+  and matched received receipts. No patrol verdict substituted for the actual
+  reviewer handback or Lead disposition.
+- Next checkpoint: Owner decision, then a new candidate and review evidence
+  if repair is authorized. Review heartbeat and idle observation seat were
+  closed while the work is parked, without granting merge/deploy authority.
+- Repair closure, 2026-10-16: Owner authorized fixing both P3s then full dual
+  review. Argon produced test-only `d7acb06` on `a919609`; Lead independently
+  checked the targeted and comparative suites and accepted/pushed that head.
+  Supervisor read both fresh actual reviewer handbacks, Opus/OCR
+  `9aad535d-b7d3-465a-b77f-2c706a37d1ee` and manual Sonnet
+  `84e583b3-ecbe-42df-bbc2-c8f10aabd01b`, followed by Lead's explicit dual-review
+  ACCEPT. Both report no head-only failures relative to base. OCR excluded four
+  test files by default path, but its reviewer read them directly and declared
+  coverage of all nine changed files. The repair/review loop is closed.
+  Remaining baseline suite failures, same-model-family review and untested
+  live deployment/browser acceptance were preserved in the owner report.
+
+## 2026-10-16 — Handback command sent a dash instead of its report
+
+- Observation: At the 16:30Z heartbeat, Argon had completed the P3 repair
+  handback, while Lead remained idle and said it was waiting for that handback.
+- Evidence: Argon `1c7d4e7f-53de-47fc-bd9b-73a9d8565be4` finished at
+  16:22:07Z. Its actual final response named candidate `d7acb06` on `a919609`,
+  four test files, verification results and remaining full-suite failures.
+  The last send used `paseo send <Lead> --no-wait - <<'EOF'`. Lead
+  `24a10d44-e704-4067-ae34-c0ccad98ebb5` received `[User] -`, then said it
+  was awaiting the report; its idle update was 16:22:11Z.
+- Suspected mechanism: The CLI treated the positional dash as literal prompt
+  text rather than reading stdin. This is not the same as a lost finish event.
+- Impact: Completed engineering work waited for an undelivered report, delaying
+  validation and reviewer dispatch.
+- Intervention: One evidence-backed question to Lead asking it to recover the
+  actual final response or request resend through `--prompt-file`, then give
+  its own disposition. Supervisor did not address Peer or accept the candidate.
+- Pattern status: Stronger causal evidence for the earlier lost-handback
+  pattern, with command-shape mismatch rather than an established notification
+  transport failure.
+- Open item: Actual report received/recovered and explicit Lead disposition.
+  A successful send acknowledgment alone does not close the loop.
+- Human decision needed: None; Lead owns this bounded communication repair.
+- Recovery checkpoint: Lead confirmed the dash-only send and recovered the
+  actual report from Argon's Paseo logs. It checked `d7acb06` changes only four
+  test files, leaves production source unchanged and has a clean worktree.
+  Lead is independently verifying tests before disposition/push/reviewer
+  dispatch. Report delivery is recovered; candidate acceptance remains open.
+- Closure at 16:35Z: Supervisor inspected Lead's actual disposition delivered
+  to Argon and Argon's response. Lead accepted `d7acb06` after independent
+  targeted, combined and comparative suite checks, pushed it to PR #302,
+  explained the dash-only delivery and required `--prompt-file` for future
+  reports. Argon acknowledged with no remaining assignment. Two fresh
+  reviewers were then dispatched on the frozen head. The handback loop is
+  closed; this does not imply the full suite is green or live acceptance.

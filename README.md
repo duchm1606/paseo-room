@@ -8,7 +8,8 @@ one machine; GitHub carries it between machines.
 ```text
 ~/.paseo/orchestration/        THIS checkout (master), same path on every host
 ├── bin/                       claude-{lead,peer,supervisor}, claude-profile,
-│                              claude-seat-token, room-install, room-sync
+│                              claude-seat-token, room-install, room-sync,
+│                              room-watch
 ├── roles/                     role law: lead, peer (Claude and Codex seats),
 │                              supervisor, watcher
 ├── hooks/                     Claude seat hooks (role-gate, inject, telemetry)
@@ -79,8 +80,15 @@ to start without one. The role prompt `roles/<role>.md` ships via
 `--append-system-prompt` and is re-injected on SessionStart by
 `hooks/inject-profile.sh` (stream-json mode drops the flag).
 
-Seats see only `skills/` plus Claude Code built-ins and repo project skills;
-`hooks/role-gate.sh` then narrows that to a per-role allow-list.
+Seats see only `skills/` and repo project skills: `disableBundledSkills` in
+`claude/seat-settings.json` removes Claude Code's built-in skills.
+`hooks/role-gate.sh` then narrows that to a per-role allow-list — Supervisor
+`grilling`, `architecture-premise-audit`, `test-proof-debt-audit`; Lead
+`repo-refresh`, `triple-review`, `council`; Peer `research`, `test-proof-debt-audit`, `browser-harness`
+— plus the per-workspace grants in `protocol/workspace-skill-grants.json`.
+`skills/browser-harness` is the upstream browser-use/browser-harness skill
+file; its `browser-harness` CLI must be installed on the host. `grilling` and
+`council` are adapted from webplode/seatworks (each skill's `NOTICE.md`).
 
 ## Codex seats
 
@@ -97,14 +105,29 @@ relaunch (or run `codex-room-sync <role>`).
 
 ## Watcher seat
 
-`watcher` is a Gemini seat on the agy-acp bridge that the
-Supervisor starts per supervised workspace and feeds PATROL letters; it
-judges Lead and Peer activity against the patterns in `roles/watcher.md`
-and answers only the Supervisor. ACP seats cannot take
-`--append-system-prompt`, so the provider passes
+`watcher` is a Gemini seat on the agy-acp bridge that the owner starts on
+demand for one Supervisor's team; the Supervisor's law does not mention
+it, and nothing tells the Supervisor it runs.
+
+```bash
+bin/room-watch <supervisor-id> [every-minutes=10] [expiry=8h]   # -n: dry run
+```
+
+`room-watch` refuses a second live Watcher for the same Supervisor (label
+`room.watch.supervisor`) and starts a root agent in the workspace whose
+directory is `~/.paseo/watcher`. From the Supervisor id the Watcher finds
+the team itself every sweep (Leads by `paseo.parent-agent-id`, then their
+Peers), arms its own heartbeat with an expiry, judges activity against
+the patterns in `roles/watcher.md`, and answers only in its own
+conversation. Tell it to stop (it deletes its heartbeat), then archive
+it.
+
+ACP seats cannot take `--append-system-prompt`, so the provider passes
 `--add-dir ~/.paseo/watcher` to agy, which loads that directory's
 `AGENTS.md` as rules and `.agents/hooks.json` as a PreToolUse gate. The
-gate denies every tool except `paseo ls|logs|inspect`. The directory
+gate denies every tool except `paseo ls|logs|inspect` and `paseo heartbeat
+create|update|delete` (Paseo scopes those to the seat's own heartbeats; a
+created one must carry `--expires-in` or `--max-runs`). The directory
 must stay outside any git repository (agy would also load the repo's
 `AGENTS.md`), and the seat must be started with it as working directory.
 
