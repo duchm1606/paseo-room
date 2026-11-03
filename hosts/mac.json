@@ -140,7 +140,7 @@
       "codex-peer": {
         "extends": "codex",
         "label": "Codex Peer",
-        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools. Four models: deepseek-v4.1-flash (the default), gpt-6-sol, gpt-5.6-sol and gpt-5.6-luna. Which role a model plays is set per workspace by that workspace's WORKSPACE_PROTOCOL.md, not here. deepseek-v4.1-flash is the declared default in BOTH this table and ~/.codex/peer.config.toml, so the model a seat resolves to and the model its record names are the same value; keep those two in step. NO OCR COVERAGE LANE (owner directive 2026-09-14): the OCR block was removed from ~/.codex/peer.config.toml and ~/.opencodereview is no longer a writable root, so a gpt-5.6-luna seat is an ordinary Peer; its thinkingOptions still offer only max. PEER DEFAULTS (owner directive 2026-09-14, from the reference Peer config): effort medium, sandbox danger-full-access, approval never. deepseek-v4.1-flash offers two thinking options, high (the default) and none, and CLIProxyAPI clamps medium to high for it; gpt-5.6-sol offers medium (the default, matching the overlay), low, high, xhigh and max; ultra is left out because it delegates tasks automatically. gpt-6-sol (added 2026-09-29) offers the same five levels; CLIProxyAPI rejects ultra for it outright. It is off the Codex catalog, so its entry lives in ~/.codex/model-catalog.1m.json and ~/.codex/peer.catalog-extra.json (cloned from gpt-5.6-sol). FAST MODE STAYS OFF (owner directive 2026-09-12): Codex fast_mode is 'Priority inference at 2x usage' and was found ON for gpt-5.6-sol on three live seats. It defaults to off, so each was turned on deliberately at spawn - do not pass featureValues.fast_mode to create_agent here.",
+        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools. Six models: deepseek-v4.1-flash (the default), gpt-6-sol, gpt-6.1-sol, gpt-6-astra, gpt-5.6-sol and gpt-5.6-luna. Which role a model plays is set per workspace by that workspace's WORKSPACE_PROTOCOL.md, not here. deepseek-v4.1-flash is the declared default in BOTH this table and ~/.codex/peer.config.toml, so the model a seat resolves to and the model its record names are the same value; keep those two in step. NO OCR COVERAGE LANE (owner directive 2026-09-14): the OCR block was removed from ~/.codex/peer.config.toml and ~/.opencodereview is no longer a writable root, so a gpt-5.6-luna seat is an ordinary Peer; its thinkingOptions still offer only max. PEER DEFAULTS (owner directive 2026-09-14, from the reference Peer config): effort medium, sandbox danger-full-access, approval never. deepseek-v4.1-flash offers two thinking options, high (the default) and none, and CLIProxyAPI clamps medium to high for it; gpt-5.6-sol offers medium (the default, matching the overlay), low, high, xhigh and max; ultra is left out because it delegates tasks automatically. gpt-6-sol (added 2026-09-29) offers the same five levels; CLIProxyAPI rejects ultra for it outright. It is off the Codex catalog, so its entry lives in ~/.codex/model-catalog.1m.json and ~/.codex/peer.catalog-extra.json (cloned from gpt-5.6-sol). gpt-6.1-sol and gpt-6-astra (added on the Mac 2026-11-03, owner request) offer the same five levels; the Mac CLIProxyAPI (Codex account anbinh250202) serves both and was probed that day: low/medium/high/xhigh/max accepted, ultra rejected. Both are off the Codex catalog too, with entries in the same two files cloned from gpt-6-sol. FAST MODE STAYS OFF (owner directive 2026-09-12): Codex fast_mode is 'Priority inference at 2x usage' and was found ON for gpt-5.6-sol on three live seats. It defaults to off, so each was turned on deliberately at spawn - do not pass featureValues.fast_mode to create_agent here.",
         "command": [
           "@HOME@/.local/bin/codex-room",
           "peer"
@@ -165,6 +165,60 @@
           {
             "id": "gpt-6-sol",
             "label": "GPT-6 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6.1-sol",
+            "label": "GPT-6.1 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6-astra",
+            "label": "GPT-6 Astra",
             "thinkingOptions": [
               {
                 "id": "medium",
@@ -333,6 +387,60 @@
           {
             "id": "gpt-6-sol",
             "label": "GPT-6 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6.1-sol",
+            "label": "GPT-6.1 Sol",
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6-astra",
+            "label": "GPT-6 Astra",
             "thinkingOptions": [
               {
                 "id": "medium",
