@@ -18,6 +18,7 @@ CODEX_ROOM="$HOME/.local/bin/codex-room"
 bash -n "$ROOM/bin/claude-profile" "$ROOM/bin/claude-lead" "$ROOM/bin/claude-peer" \
   "$ROOM/bin/claude-supervisor" "$ROOM/bin/claude-seat-token" \
   "$ROOM/bin/room-install" "$ROOM/bin/room-sync" \
+  "$ROOM/bin/claude-glm" "$ROOM/bin/pi-feynman" \
   "$ROOM/codex/bin/codex-room" "$ROOM"/hooks/*.sh "$ROOM/watcher/watcher-gate.sh" \
   || die "bash -n on launchers/hooks"
 python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$ROOM/codex/bin/codex-room-sync" \
@@ -104,6 +105,15 @@ unfenced="$(jq -r '.agents.providers | to_entries[]
            else ((.value.disallowedTools // []) | index("mcp__paseo")) == null end)
   | .key' "$HOME/.paseo/config.json")"
 [ -z "$unfenced" ] || die "Peer-shaped seats with no barrier against the Paseo MCP: $(echo $unfenced)"
+# Pi seats read neither disallowedTools nor supportsMcpServers. Paseo hands a
+# Pi seat its MCP only when the pi-mcp-adapter extension is installed
+# (PiRpcAgentClient.prepareMcpConfig, read 2026-10-12), so that absence is
+# their barrier.
+if jq -e '[.agents.providers[] | select(.extends == "pi" and .enabled != false)] | length > 0' \
+     "$HOME/.paseo/config.json" >/dev/null \
+   && grep -qs 'pi-mcp-adapter' "$HOME/.pi/agent/settings.json"; then
+  die "pi-mcp-adapter is installed in ~/.pi/agent: Pi seats would receive the Paseo MCP"
+fi
 
 # 4c. Room skills are well-formed: one SKILL.md per directory, named after it.
 for d in "$ROOM"/skills/*/; do

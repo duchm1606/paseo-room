@@ -67,7 +67,7 @@
       "lead": {
         "extends": "claude",
         "label": "Lead-of-record",
-        "description": "Router and binding arbiter \u2014 planning, coordination, acceptance",
+        "description": "Router and binding arbiter — planning, coordination, acceptance",
         "command": [
           "@HOME@/.paseo/orchestration/bin/claude-lead"
         ],
@@ -348,6 +348,85 @@
           }
         },
         "order": 23
+      },
+      "glm": {
+        "extends": "claude",
+        "label": "GLM (Z.ai)",
+        "description": "GLM models via Z.ai Anthropic-compatible endpoint; key in ~/.paseo/glm.key",
+        "command": [
+          "@HOME@/.paseo/orchestration/bin/claude-glm"
+        ],
+        "models": [
+          {
+            "id": "glm-5.3",
+            "label": "GLM-5.3",
+            "isDefault": true
+          },
+          {
+            "id": "glm-5.3-flash",
+            "label": "GLM-5.3-Flash (Vision)"
+          }
+        ],
+        "disallowedTools": [
+          "Task",
+          "Agent",
+          "Workflow",
+          "mcp__paseo"
+        ],
+        "order": 40
+      },
+      "glm-researcher": {
+        "extends": "pi",
+        "label": "GLM Researcher",
+        "description": "Feynman research agent (github.com/Companion-Inc/feynman) on GLM through the Z.ai Coding Plan, run by Pi. bin/pi-feynman starts pi with Feynman's system prompt and ZAI_API_KEY from ~/.paseo/glm.key; Feynman 0.5.36 and its core Pi packages (pi-subagents, pi-web-access, pi-docparser, pi-btw) are installed in ~/.pi/agent with `pi install`, and ~/.pi/agent/settings.json carries the subagent wiring the feynman launcher would write. Use /deepresearch, /lit, /review, /compare, /summarize; artifacts land in outputs/ and papers/ under the agent's cwd (~/research is set up for this). /deepresearch writes a plan and waits for a \"yes\" before it searches. Peer-shaped with no Paseo tools: Paseo hands its MCP to a Pi seat only when the pi-mcp-adapter extension is installed (PiRpcAgentClient.prepareMcpConfig), and disallowedTools is not read by the Pi client, so the barrier is that adapter's absence; smoke checks it. Pi has no permission modes. GLM-5.3 accepts thinking low, high and max only.",
+        "command": [
+          "@HOME@/.paseo/orchestration/bin/pi-feynman"
+        ],
+        "env": {
+          "PATH": "@HOME@/.npm-global/bin:@HOME@/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        },
+        "models": [
+          {
+            "id": "zai/glm-5.3",
+            "label": "GLM-5.3",
+            "isDefault": true,
+            "thinkingOptions": [
+              {
+                "id": "high",
+                "label": "High",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "zai/glm-5.3-flash",
+            "label": "GLM-5.3-Flash (Vision)",
+            "thinkingOptions": [
+              {
+                "id": "high",
+                "label": "High",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          }
+        ],
+        "order": 41
       }
     }
   }
