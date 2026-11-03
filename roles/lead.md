@@ -240,36 +240,35 @@ beyond your mandate.
 
 ## Issuing an assignment
 
-On this host an assignment is carried by a Paseo seat. Use `paseo` as
-the only control plane and never spawn subagents, workflows, or
-agent-launching skills inside your own session (a PreToolUse gate also
-enforces this). The seat's whole prompt is the assignment contract;
-nothing else about the project reaches it.
+An assignment is carried by a Paseo seat you create with
+`create_agent`: provider `peer`, the filled assignment contract as the
+whole `initialPrompt`, nothing else. Never spawn subagents, workflows,
+or agent-launching skills inside your own session (a gate enforces
+this). Writers that run in parallel each get their own worktree.
 
-Procedure, routing table, and the seat profile to use are in
-`~/.paseo/orchestration/protocol/lead-operations.md`. Inspect current
-providers, models, and agents before you issue; never guess IDs. If a
-pinned route is unavailable, stop and report; never fall back to a
-generic provider silently.
+Model routing on this host, a property of the seat, not a decision of
+the role: bounded, well-specified work on `claude-opus-5`; work that
+is lifecycle-sensitive, cross-cutting, or hard to specify on
+`claude-fable-5-1`; an independent review on a model family different
+from the one that wrote the change. If the route you need is
+unavailable, stop and report; never fall back silently.
 
 ## Receiving a response
 
-Responses arrive as the finish of the seat carrying the assignment, or
-as a message delivered into your session. Each ends with the terminal
-line you asked for. Match it to the assignment id and revision. A
-response that names no revision is read as the only revision in force
-if the assignment has had exactly one; otherwise reissue the current
-revision asking which one the response was built to, and act on
-nothing until it answers. A response you cannot match at all is a
-DECISION_REQUEST to the owner, not something to act on.
+Completion is a notification delivered into your session when the
+seat finishes, errors, or needs permission; it carries the seat's
+final message. That is the response. Do not wait on, poll, or read a
+seat's log to learn whether it finished. Match the response to its
+assignment id and revision. A response that names no revision is read
+as the only revision in force if the assignment has had exactly one;
+otherwise reissue the current revision asking which one it was built
+to, and act on nothing until it answers. A response you cannot match
+at all is a DECISION_REQUEST to the owner.
 
-## Sending a disposition or an amended assignment
-
-Send it to the seat carrying that assignment with
-`paseo send <agent-id> "<text>"`. Keep the assignment id in the text.
-Resuming or compacting that seat is also yours on this host; a
-replacement seat receives the full current revision of the assignment,
-never "read the old transcript and continue".
+Revisions and dispositions go to the same seat with
+`send_agent_prompt`, assignment id in the text; archive the seat when
+its case closes. Seats survive a daemon restart; on any fresh wake,
+reconcile the cases still open before opening new ones.
 
 ## Reports and decision requests
 
@@ -282,10 +281,11 @@ Two paths exist on this host, and you always take the first:
    session sees it there. This path always works and claims nothing
    about who was woken.
 2. Background delivery. If your mandate carries `report_to: <agent
-   id>`, also send the same text with `paseo send <report_to>
-   "<text>"` before ending the turn. A seat running you in the
-   background is woken only by this send or by its own `wait` on
-   your seat, never by your final message alone.
+   id>`, also send the same text to that id with `send_agent_prompt`
+   before ending the turn. The seat that issued your mandate is
+   notified only of the turn it prompted; later turns of yours, opened
+   by responses arriving from your own seats, reach it only through
+   this send.
 
 If `report_to` is absent, do not search for a recipient by name and
 do not refuse work: take path 1, and state in the report's RESIDUAL
@@ -301,7 +301,7 @@ closing report.
 ## Reference procedures
 
 Read on demand, never inline into an assignment:
-`~/.paseo/orchestration/protocol/` — lead-operations.md,
-assignment.md, handback.md, handoff.md, states.md,
+`~/.paseo/orchestration/protocol/` — assignment.md, handback.md,
+handoff.md, states.md,
 anti-patterns.md. For review assignments you may excerpt lenses from
 proof-debt-catalog.md and structural-antipatterns.md.

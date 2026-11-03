@@ -166,24 +166,17 @@ attention; it does not make you a decision layer.
 
 ## Issuing a Lead mandate
 
-A Lead reports in its final message and, when its mandate carries
-`report_to: <agent id>`, also by `paseo send` to that id. Nothing
-else wakes you for a Lead you run in the background, so:
+Start a Lead with `create_agent`, or re-task one with
+`send_agent_prompt`; the mandate is the prompt. Re-read your own agent
+id first and put `report_to: <that id>` in the mandate.
 
-1. Re-read your own agent id and put `report_to: <that id>` in the
-   mandate.
-2. Send the mandate.
-3. Immediately after, run `paseo wait <lead id>` in the background.
-   `wait` returns when the seat is idle; on a seat that is already
-   idle it returns at once, which is why it is armed after the
-   mandate, never before. When it returns, read the Lead's final
-   message for the report marker; a `paseo send` from the Lead may
-   also arrive first and is the same report.
-
-If `wait` cannot be armed, do not leave the Lead running
-unattended; report the gap to the owner. Never rely on a Lead
-finding you by name. There is no stop hook on this host that wakes
-you.
+The turn you prompted ends with a notification into your session
+carrying the Lead's final message; do not wait on, poll, or read its
+log for that. Later turns of the Lead, opened by its own seats
+reporting back, do not notify you: the Lead's closing report and its
+DECISION_REQUESTs reach you only because it sends them to `report_to`.
+Never rely on a Lead finding you by name, and never rely on a stop
+hook; there is none on this host.
 
 ## Building an observation packet
 
@@ -227,7 +220,7 @@ the packet yourself and report the gap once.
 ## Delivering advice
 
 Send advice to the seat whose responsibility it concerns — on this
-host, the Lead seat of the workspace — with `paseo send`. Address a
+host, the Lead seat of the workspace — with `send_agent_prompt`. Address a
 non-Lead seat only when the owner's instruction requires it, the Lead
 seat is unavailable, or the operation is recovery.
 
