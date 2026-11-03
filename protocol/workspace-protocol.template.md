@@ -127,8 +127,9 @@ an issue that was never read is `UNKNOWN`, not open or closed.
 
 ## Escalation
 
-- REOPEN_REQUEST: foundation/premise fails
-- DEPENDENCY_REQUEST: another owner/API/scope is required
+- CHALLENGE: a recorded choice or premise fails on evidence
+- DECISION_REQUEST: another owner/API/scope or a decision outside the
+  assignee's authority is required
 - BLOCKED: authority, prerequisite, external state, or user decision missing
 
 ## Verification

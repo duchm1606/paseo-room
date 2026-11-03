@@ -43,9 +43,11 @@ edits, and always name the mutation boundary explicitly.
 - **One Engineer per writable scope.** Never run two Engineers whose write
   scopes can touch the same files. For parallel work, use
   `--new-workspace worktree` so each owner gets an isolated checkout.
-- **Context packs follow `context-pack.md`** — goal, verified facts, real
-  constraints, acceptance contract, granted permissions. Direct work-request
-  voice. Never mention paseo, sessions, or orchestration mechanics to peers.
+- **Assignments follow `assignment.md`** — outcome, must hold, decided,
+  unknown, scope, acceptance, out of scope, facts, respond. Direct
+  work-request voice. The assignment names no issuing seat, no
+  acceptance owner, and no other party; never mention paseo, sessions,
+  or orchestration mechanics to an assignee.
 - **No polling.** `wait` blocks until idle — that is your completion signal.
   If `wait` times out, `inspect` once, read `logs` once, decide: extend the
   wait, send a follow-up, or rule the case blocked. Do not loop status
@@ -59,11 +61,11 @@ edits, and always name the mutation boundary explicitly.
 - **Council seats** are separate `run` invocations with a neutral brief and
   an explicit method each — never share one session across seats, never let
   a seat read another seat's output.
-- **Rulings are in-thread.** Before a case proceeds past a
-  REOPEN_REQUEST, DEPENDENCY_REQUEST, BLOCKED, or an overridden
-  dissent, state the concrete ruling and its reasons in the
-  conversation (request gist → ruling → reasons → dissent kept
-  yes/no). Session logs are the archive; no record files.
+- **Rulings are in-thread.** Before a case proceeds past a CHALLENGE,
+  DECISION_REQUEST, BLOCKED, or an overridden dissent, state the
+  concrete ruling and its reasons as a revision of the assignment
+  (request gist → ruling → reasons → dissent kept yes/no). Session
+  logs are the archive; no record files.
 - **Session economics.** Prefer follow-ups into a live session (hot cache)
   while the mental model is valuable; spawn fresh with a tighter context
   pack when the session has compacted repeatedly or drifted. `logs` before

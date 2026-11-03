@@ -1,5 +1,10 @@
 # Handback (peer/Engineer → Lead)
 
+Lead-side reading guide only. What an assignee must put in a RESULT is
+defined by its role prompt and `assignment.md`; an assignee never reads
+this file. The CONFIRM / PARTIAL / CHALLENGE / BLOCKED position below
+maps to response kinds per `states.md`.
+
 A handback returns a lease upward with evidence. Moving state and
 authority sideways to a successor is a *handoff* — see `handoff.md`.
 

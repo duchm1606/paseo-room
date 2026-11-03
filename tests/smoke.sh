@@ -19,24 +19,21 @@ bash -n "$ROOM/bin/claude-profile" "$ROOM/bin/claude-lead" "$ROOM/bin/claude-pee
   "$ROOM/bin/claude-supervisor" "$ROOM/bin/claude-seat-token" \
   "$ROOM/bin/room-install" "$ROOM/bin/room-sync" \
   "$ROOM/codex/bin/codex-room" "$ROOM"/hooks/*.sh "$ROOM/watcher/watcher-gate.sh" \
-  "$ROOM/droid/role-gate.sh" \
   || die "bash -n on launchers/hooks"
 python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$ROOM/codex/bin/codex-room-sync" \
   || die "codex-room-sync does not parse"
-for f in "$ROOM"/hosts/*.json "$ROOM/claude/seat-settings.json" "$ROOM/droid/seat-settings.json"; do
+for f in "$ROOM"/hosts/*.json "$ROOM/claude/seat-settings.json"; do
   jq -e . "$f" >/dev/null || die "$f is not valid JSON"
 done
 
 # 3. Provider commands: claude seats launch from the room checkout; the seats
 #    built on another tool launch from ~/.local/bin, where that tool's own
-#    config lives — codex-room for Codex, agy-acp for the Gemini ACP bridge,
-#    droid for Factory Droid (native ACP, no bridge).
+#    config lives — codex-room for Codex, agy-acp for the Gemini ACP bridge.
 outside="$(jq -r '.agents.providers | to_entries[] | select(.value.command) | .value.command[0]' \
   "$HOME/.paseo/config.json" \
   | grep -v -e "^$HOME/.paseo/orchestration/bin/" \
             -e "^$HOME/.local/bin/codex-room$" \
-            -e "^$HOME/.local/bin/agy-acp$" \
-            -e "^$HOME/.local/bin/droid$")"
+            -e "^$HOME/.local/bin/agy-acp$")"
 [ -z "$outside" ] || die "unexpected provider command: $outside"
 
 # 4. Codex roles the provider table actually launches: installed from this
@@ -107,39 +104,6 @@ unfenced="$(jq -r '.agents.providers | to_entries[]
            else ((.value.disallowedTools // []) | index("mcp__paseo")) == null end)
   | .key' "$HOME/.paseo/config.json")"
 [ -z "$unfenced" ] || die "Peer-shaped seats with no barrier against the Paseo MCP: $(echo $unfenced)"
-
-# 4b'''. Droid seats: law and gate come from droid/seat-settings.json through
-#        --settings, skills from ~/.factory/skills, and the gate denies what it
-#        must. A Droid Peer's MCP fence is checked with the others in 4b''.
-droid_seats="$(jq -r '.agents.providers | to_entries[]
-  | select(.value.env.ROOM_ROLE? and (.value.command[0]? | tostring | endswith("/.local/bin/droid")))
-  | "\(.key) \(.value.env.ROOM_ROLE) \(.value.command | index("--settings") as $i | if $i then .[$i + 1] else "" end)"' \
-  "$HOME/.paseo/config.json")"
-if [ -n "$droid_seats" ]; then
-  while read -r name role settings; do
-    [ "$settings" = "$ROOM/droid/seat-settings.json" ] || die "$name: must launch with --settings $ROOM/droid/seat-settings.json"
-    [ -f "$ROOM/roles/$role.md" ] || die "$name: ROOM_ROLE=$role has no roles/$role.md"
-  done <<<"$droid_seats"
-  [ "$(readlink "$HOME/.factory/skills")" = "$ROOM/skills" ] || die "droid seats: ~/.factory/skills must link to $ROOM/skills"
-  dgate() { # dgate <role> <tool> <input-json> -> allow|deny
-    local out
-    out="$(jq -cn --arg t "$2" --argjson i "$3" '{tool_name:$t, tool_input:$i}' | ROOM_ROLE="$1" bash "$ROOM/droid/role-gate.sh")"
-    if [ -z "$out" ]; then echo allow; else jq -r '.hookSpecificOutput.permissionDecision' <<<"$out"; fi
-  }
-  mem="$HOME/.claude/projects/x/memory/a.md"
-  for c in "peer|Task|{}" "lead|StartMissionRun|{}" "supervisor|CreateAutomation|{}" \
-           "supervisor|StageSettingsChanges|{}" "peer|Execute|{\"command\":\"ocr review .\"}" \
-           "peer|Skill|{\"skill\":\"session-navigation\"}" "peer|Create|{\"file_path\":\"$mem\"}" \
-           "lead|ApplyPatch|{\"input\":\"*** Begin Patch\\n*** Update File: $mem\\n*** End Patch\\n\"}"; do
-    IFS='|' read -r r t i <<<"$c"
-    [ "$(dgate "$r" "$t" "$i")" = deny ] || die "droid gate allows $t for $r"
-  done
-  for c in "peer|Execute|{\"command\":\"echo hi\"}" "peer|Skill|{\"skill\":\"tdd\"}" \
-           "lead|Skill|{\"skill\":\"triple-review\"}" "peer|ApplyPatch|{\"input\":\"*** Begin Patch\\n*** Add File: /tmp/x\\n*** End Patch\\n\"}"; do
-    IFS='|' read -r r t i <<<"$c"
-    [ "$(dgate "$r" "$t" "$i")" = allow ] || die "droid gate blocks $t for $r"
-  done
-fi
 
 # 4c. Room skills are well-formed: one SKILL.md per directory, named after it.
 for d in "$ROOM"/skills/*/; do
