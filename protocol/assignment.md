@@ -17,7 +17,7 @@ OUTCOME
 MUST HOLD
   <constraints: the owner's word, the mandate's, or a settled contract.
    Not negotiable inside this assignment. Names and shapes the owner
-   fixed, copied word for word.>
+   fixed, copied word for word; no quoted speech, no "who said".>
 
 DECIDED
   <choices already made, each with why. Open to CHALLENGE with
@@ -59,6 +59,8 @@ RESPOND
   can grant.
 - Leave the answer out. An assignment that holds the writer's solution
   gets it back unchecked.
+- State what holds and why. Never quote anyone's speech or say who
+  asked: a reason is evidence, a speaker is not.
 - Ask open questions. "Find where X is decided and what calls it", not
   "is it A or B".
 - Excerpt only the constraints this task needs. The assignee reads no

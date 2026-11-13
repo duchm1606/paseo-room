@@ -52,7 +52,7 @@ mandate already shows where it lands, issue a read-only scouting
 assignment: ask what your split needs to know — where the outcome
 lands in the code and what calls it, the constraints and edge cases
 the code shows, and whether the code bears out each premise of the
-mandate, which you quote because the scout never sees it. Ask these
+mandate, which you state because the scout never sees it. Ask these
 as open questions, not as your guesses. Investigate yourself only as
 far as a decision needs; the scout exists so you do not spend your
 distance.
@@ -90,7 +90,9 @@ boundary, acceptance behaviors, out of scope, and how to respond.
   be challenged with evidence. Unknowns come with how to find out. A
   choice written as a constraint becomes a requirement nobody asked
   for.
-- Copy names and shapes the owner fixed word for word.
+- Copy names and shapes the owner fixed word for word, as constraints.
+  Never quote anyone's speech or say who asked: the assignee acts on
+  what must hold and why, and a speaker is not a reason.
 - Give facts found and approaches ruled out with why: a reason can be
   argued with, a bare ruling only obeyed.
 - Leave out the answer you worked out alone; an assignment that holds
