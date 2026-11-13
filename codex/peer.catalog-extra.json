@@ -5,7 +5,28 @@
       "slug": "deepseek-v4.1-flash",
       "display_name": "deepseek-v4.1-flash",
       "description": null,
-      "supported_reasoning_levels": [],
+      "supported_reasoning_levels": [
+        {
+          "effort": "none",
+          "description": "No reasoning, fastest responses"
+        },
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        },
+        {
+          "effort": "max",
+          "description": "Maximum reasoning depth for the hardest problems"
+        }
+      ],
       "shell_type": "default",
       "visibility": "none",
       "supported_in_api": true,
@@ -32,7 +53,8 @@
       "effective_context_window_percent": 95,
       "experimental_supported_tools": [],
       "supports_search_tool": false,
-      "use_responses_lite": false
+      "use_responses_lite": false,
+      "default_reasoning_level": "high"
     },
     {
       "slug": "gpt-6-sol",

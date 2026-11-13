@@ -23,7 +23,7 @@ bash -n "$ROOM/bin/claude-profile" "$ROOM/bin/claude-lead" "$ROOM/bin/claude-pee
   || die "bash -n on launchers/hooks"
 python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$ROOM/codex/bin/codex-room-sync" \
   || die "codex-room-sync does not parse"
-for f in "$ROOM"/hosts/*.json "$ROOM/claude/seat-settings.json"; do
+for f in "$ROOM/room.json" "$ROOM/claude/seat-settings.json"; do
   jq -e . "$f" >/dev/null || die "$f is not valid JSON"
 done
 
@@ -62,15 +62,14 @@ for role in $codex_roles; do
     || die "$role: catalog still advertises native agents"
 done
 
-# 4b. The live provider table is the rendered host template: any drift means a
-#     hand edit that the next room-install would silently revert.
-host="$(cat "$HOME/.paseo/room-host" 2>/dev/null || true)"
-if [ -n "$host" ]; then
-  want="$(jq -S --arg h "$HOME" 'walk(if type=="string" then gsub("@HOME@"; $h) else . end)
-    | {mcp: .daemon.mcp, pluginsEnabled, plugins, providers: .agents.providers}' "$ROOM/hosts/$host.json")"
-  have="$(jq -S '{mcp: .daemon.mcp, pluginsEnabled, plugins, providers: .agents.providers}' "$HOME/.paseo/config.json")"
-  [ "$want" = "$have" ] || die "~/.paseo/config.json drifted from hosts/$host.json (run bin/room-install, or move the edit into the repo)"
-fi
+# 4b. The live provider table is room.json rendered, the same on every host:
+#     any drift means a hand edit that the next room-install would silently
+#     revert.
+[ ! -d "$ROOM/hosts" ] || die "hosts/ is back: there is one room.json for every host"
+want="$(jq -S --arg h "$HOME" 'walk(if type=="string" then gsub("@HOME@"; $h) else . end)
+  | {mcp: .daemon.mcp, pluginsEnabled, plugins, providers: .agents.providers}' "$ROOM/room.json")"
+have="$(jq -S '{mcp: .daemon.mcp, pluginsEnabled, plugins, providers: .agents.providers}' "$HOME/.paseo/config.json")"
+[ "$want" = "$have" ] || die "~/.paseo/config.json drifted from room.json (run bin/room-install, or move the edit into the repo)"
 
 # 4b'. Watcher: law and gate linked where the provider exists, the directory
 #      outside any git repository, and the gate denies what it must.

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pi running Feynman's research agent (github.com/Companion-Inc/feynman) on
-# GLM through the Z.ai Coding Plan. Paseo appends --mode rpc, --model,
+# GLM through the Z.ai Coding Plan, or on DeepSeek V4.1 Flash through the
+# local CLIProxyAPI (Mistral upstream). Paseo appends --mode rpc, --model,
 # --thinking and --session.
 #
 # Feynman and its core Pi packages (pi-subagents, pi-web-access,
@@ -10,11 +11,20 @@
 # command line: Feynman's system prompt, so the seat is Feynman in any cwd.
 #
 # The Z.ai key is read from ~/.paseo/glm.key (mode 600), the same key the glm
-# seat uses.
+# seat uses. The cliproxy provider is declared in ~/.pi/agent/models.json and
+# authenticates with CLIPROXY_API_KEY: an exported value wins (duckling-oci
+# sets it in the daemon's systemd EnvironmentFile), else it is read from the
+# proxy config the way codex-room does.
 set -euo pipefail
 FEYNMAN="$HOME/.pi/agent/npm/node_modules/@companion-ai/feynman"
 KEY_FILE="$HOME/.paseo/glm.key"
 [ -s "$FEYNMAN/.feynman/SYSTEM.md" ] || { echo "pi-feynman: Feynman is not installed (pi install npm:@companion-ai/feynman)" >&2; exit 3; }
 [ -s "$KEY_FILE" ] || { echo "pi-feynman: $KEY_FILE missing or empty" >&2; exit 3; }
 export ZAI_API_KEY="$(tr -d '[:space:]' < "$KEY_FILE")"
+if [ -z "${CLIPROXY_API_KEY:-}" ]; then
+  CLIPROXY_API_KEY="$(sed -n '/^api-keys:/,/^[A-Za-z#]/p' \
+    /opt/homebrew/etc/cliproxyapi.conf "$HOME/.cli-proxy-api/config.yaml" 2>/dev/null |
+    grep -oE '[A-Za-z0-9]{32,}' | head -1 || true)"
+fi
+export CLIPROXY_API_KEY
 exec pi --system-prompt "$FEYNMAN/.feynman/SYSTEM.md" "$@"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # agy PreToolUse gate for the Watcher seat. room-install links it, with
 # hooks.json, into ~/.paseo/watcher/.agents/, which the provider `watcher`
-# (hosts/mac.json) loads through --add-dir. The Watcher may run only
+# (room.json) loads through --add-dir. The Watcher may run only
 # read-only paseo commands; every other tool — file reads and writes
 # included — is denied here, so its law does not rest on the model obeying.
 payload="$(cat)"

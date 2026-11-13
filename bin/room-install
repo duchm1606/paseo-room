@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# room-install [host]: apply this checkout to the machine it runs on.
+# room-install: apply this checkout to the machine it runs on.
 #
 # The repo is the source; each tool keeps reading its own home. This script
 # is the only thing that writes from one to the other, and it is idempotent:
 # a second run with nothing changed touches nothing.
 #
-#   hosts/<host>.json        -> ~/.paseo/config.json   (daemon.mcp, pluginsEnabled,
+#   room.json                -> ~/.paseo/config.json   (daemon.mcp, pluginsEnabled,
 #                                                      plugins, agents.providers; every
 #                                                      other key is daemon-owned
 #                                                      and left alone)
@@ -15,8 +15,14 @@
 #   skills/                  <- ~/.claude/profiles/claude-<role>/skills (symlink)
 #   codex/bin/*              <- ~/.local/bin/codex-room{,-sync}  (symlinks)
 #   codex/peer.*             <- ~/.codex/peer.{config.toml,catalog-extra.json}
+#   codex/supervisor.config.toml <- ~/.codex/supervisor.config.toml
 #   roles/watcher.md, watcher/ <- ~/.paseo/watcher/{AGENTS.md,.agents/}  (Watcher
 #                                law and tool gate, loaded by agy --add-dir)
+#
+# One room.json serves every host. What a machine can actually run (which
+# accounts sit behind its CLIProxyAPI, whether a seat's key or binary is
+# there) is machine state, not configuration: a seat this host cannot serve
+# fails at launch and says why.
 #
 # Secrets never live in the repo. A seat settings file that does not exist yet
 # takes its CLAUDE_CODE_OAUTH_TOKEN from the seat template, else from the
@@ -28,11 +34,9 @@
 set -euo pipefail
 
 ROOM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST_FILE="$HOME/.paseo/room-host"
-host="${1:-$(cat "$HOST_FILE" 2>/dev/null || true)}"
-[ -n "$host" ] || { echo "usage: room-install <host>   (hosts: $(cd "$ROOM/hosts" && ls *.json | sed 's/\.json$//' | tr '\n' ' '))" >&2; exit 2; }
-HOST_JSON="$ROOM/hosts/$host.json"
-[ -f "$HOST_JSON" ] || { echo "room-install: no hosts/$host.json" >&2; exit 2; }
+ROOM_JSON="$ROOM/room.json"
+[ -f "$ROOM_JSON" ] || { echo "room-install: no room.json in $ROOM" >&2; exit 2; }
+[ $# -eq 0 ] || echo "room-install: ignoring argument '$1': one room.json serves every host" >&2
 [ "$ROOM" = "$HOME/.paseo/orchestration" ] \
   || { echo "room-install: checkout is at $ROOM; the daemon launches seats from ~/.paseo/orchestration" >&2; exit 2; }
 
@@ -44,7 +48,7 @@ ts="$(date +%Y%m%d-%H%M%S)"
 umask 077
 say() { printf 'room-install: %s\n' "$*"; }
 
-rendered="$(jq --arg h "$HOME" 'walk(if type=="string" then gsub("@HOME@"; $h) else . end)' "$HOST_JSON")"
+rendered="$(jq --arg h "$HOME" 'walk(if type=="string" then gsub("@HOME@"; $h) else . end)' "$ROOM_JSON")"
 uses_codex_room="$(jq -r --arg c "$HOME/.local/bin/codex-room" \
   '[.agents.providers[] | select(.command[0]? == $c)] | length > 0' <<<"$rendered")"
 
@@ -71,6 +75,7 @@ if [ "$uses_codex_room" = true ]; then
   place "$HOME/.local/bin/codex-room-sync" "$ROOM/codex/bin/codex-room-sync"
   place "$HOME/.codex/peer.config.toml" "$ROOM/codex/peer.config.toml"
   place "$HOME/.codex/peer.catalog-extra.json" "$ROOM/codex/peer.catalog-extra.json"
+  place "$HOME/.codex/supervisor.config.toml" "$ROOM/codex/supervisor.config.toml"
 fi
 
 # 1b. Watcher law directory, only where a `watcher` provider exists. It must
@@ -133,5 +138,5 @@ else
   say "updated $CONFIG (previous: $CONFIG.bak-room-$ts); restart the daemon to load it"
 fi
 
-printf '%s\n' "$host" > "$HOST_FILE"
+rm -f "$HOME/.paseo/room-host"   # left by the per-host installer; nothing reads it now
 "$ROOM/tests/smoke.sh"

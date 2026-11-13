@@ -2,8 +2,9 @@
 
 This git checkout owns the room coordination layer — Claude seat launchers,
 hooks, role prompts, protocol doctrine — plus the sources for what the room
-manages inside other tools' homes. `bin/room-install <host>` applies it to
-one machine; GitHub carries it between machines.
+manages inside other tools' homes. `bin/room-install` applies it to the
+machine it runs on; GitHub carries it between machines. Every host gets the
+same configuration: there is no per-host file.
 
 ```text
 ~/.paseo/orchestration/        THIS checkout (master), same path on every host
@@ -14,9 +15,10 @@ one machine; GitHub carries it between machines.
 ├── hooks/                     Claude seat hooks (role-gate, inject, telemetry)
 ├── protocol/                  room doctrine (workspace protocol, handoff, ...)
 ├── skills/                    the seat skill set (seats see only these)
-├── hosts/<host>.json          provider table per host (mac, duckling-oci)
+├── room.json                  provider table, the same on every host
 ├── claude/seat-settings.json  seat settings minus the token
-├── codex/                     codex-room, codex-room-sync, peer overlay
+├── codex/                     codex-room, codex-room-sync, peer and
+│                              supervisor overlays
 ├── watcher/                   Watcher tool gate (agy PreToolUse hook)
 ├── PHILOSOPHY.md TARGET.md SUPERVISOR_NOTEBOOK.md
 ├── telemetry/  attic/         operational data + old backups (gitignored)
@@ -24,12 +26,13 @@ one machine; GitHub carries it between machines.
 
 Installed by room-install (symlink or rendered copy):
 ~/.paseo/config.json           daemon.mcp, pluginsEnabled, plugins, agents.providers
-                               <- hosts/<host>.json with @HOME@ expanded
+                               <- room.json with @HOME@ expanded
 ~/.claude/profiles/settings.json            seat template   } managed keys from
 ~/.claude/profiles/claude-<role>/settings.json  per seat    } claude/, token kept
 ~/.claude/profiles/claude-<role>/skills  -> skills/
 ~/.local/bin/codex-room{,-sync}          -> codex/bin/
 ~/.codex/peer.{config.toml,catalog-extra.json} -> codex/
+~/.codex/supervisor.config.toml          -> codex/
 ~/.paseo/watcher/AGENTS.md               -> roles/watcher.md
 ~/.paseo/watcher/.agents/{hooks.json,watcher-gate.sh} -> watcher/
 ```
@@ -57,11 +60,10 @@ paseo-daemon` on duckling-oci.
 
 ```bash
 git clone https://github.com/duchm1606/paseo-room.git ~/.paseo/orchestration
-~/.paseo/orchestration/bin/room-install <host>      # hosts/<host>.json
+~/.paseo/orchestration/bin/room-install
 ```
 
-Prerequisites: `jq`, `claude`, and — when the host has a `codex-peer`
-provider — `codex`, `python3` and a running CLIProxyAPI whose key is in
+Prerequisites: `jq`, `claude`, `codex`, `python3` and a running CLIProxyAPI whose key is in
 `CLIPROXY_API_KEY` or the proxy config. The daemon must have started once so
 `~/.paseo/config.json` exists. A seat without a token is seeded from the seat
 template, else from the operator's `~/.claude/settings.json`; otherwise mint
@@ -87,10 +89,12 @@ Seats see only `skills/` plus Claude Code built-ins and repo project skills;
 `codex-room <role>` regenerates `~/.codex-runtime/<role>/` on every launch:
 base `~/.codex/config.toml` + overlay `~/.codex/<role>.config.toml` ->
 merged `config.toml`, plus a model catalog patched to disable Codex-native
-agents and floor reasoning at high. Only `peer` is wired to a provider
-(`codex-peer`); its overlay is versioned here and takes its instructions
-from `roles/peer.md` (`room_instructions_file`), the same law the Claude
-peer seat runs.
+agents and floor reasoning at high. Two roles are wired to a provider:
+`peer` (`codex-peer`) and `supervisor` (`codex-supervisor`). Their overlays
+are versioned here and take their instructions from `roles/peer.md` and
+`roles/supervisor.md` (`room_instructions_file`), the same law the Claude
+seats run. A role's Codex seat sees the operator's `~/.codex/skills` plus
+the room skills `codex-room-sync` lists for it (`ROOM_SKILLS`).
 
 Never edit a generated `config.toml` — change the base or the overlay and
 relaunch (or run `codex-room-sync <role>`).
@@ -121,6 +125,25 @@ cargo build --release && install -m 755 target/release/agy-acp ~/.local/bin/
 # copy ~/.gemini/antigravity-cli/antigravity-oauth-token (mode 600) from a
 # signed-in host.
 ```
+
+## Host notes
+
+`room.json` is the same everywhere. What differs between machines is what
+they have, and a seat a machine cannot serve fails at launch with the reason.
+
+- Mac: CLIProxyAPI from Homebrew (`/opt/homebrew/etc/cliproxyapi.conf`).
+  Its Codex account (anbinh250202) serves gpt-6.1-sol and gpt-6-astra
+  (probed 2026-11-03: low to max accepted, ultra rejected). No `pi`, no
+  `~/.paseo/glm.key`: `glm` and `glm-researcher` do not start here.
+- duckling-oci: CLIProxyAPI key in the daemon environment (systemd
+  EnvironmentFile `~/.config/cliproxy.env`). Its Codex OAuth account
+  (nguyenanhem91, moved from the Mac 2026-10-01) serves deepseek-v4.1-flash
+  and gpt-6.1-sol; the other `codex-peer` models and the `codex-supervisor`
+  model are listed but not served unless that account gains them. agy
+  1.2.14 linux_arm64 from the official installer, agy-acp built on the host
+  from `~/.local/src/agy-acp`, Google sign-in copied from the Mac token
+  file; the paseo CLI is in `~/.npm-global/bin`. `~/.paseo/glm.key` and
+  `~/.pi/agent/models.json` are here, so the GLM seats run here.
 
 ## Verify
 

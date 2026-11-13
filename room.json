@@ -33,12 +33,12 @@
         "models": [
           {
             "id": "claude-opus-5-5",
-            "label": "Opus 5.5 (1M)"
+            "label": "Opus 5.5 (1M)",
+            "isDefault": true
           },
           {
             "id": "claude-opus-5",
-            "label": "Opus 5 (1M)",
-            "isDefault": true
+            "label": "Opus 5 (1M)"
           },
           {
             "id": "claude-opus-4-8[1m]",
@@ -64,10 +64,62 @@
         ],
         "order": 1
       },
+      "codex-supervisor": {
+        "extends": "codex",
+        "label": "Codex Supervisor",
+        "description": "Supervisor seat on Codex (owner request 2026-11-05), one model: gpt-6-astra through the host's CLIProxyAPI. Carries roles/supervisor.md as developer_instructions through codex/supervisor.config.toml (room_instructions_file), the same law the Claude supervisor seat gets. Holds the Paseo tools: mcp__paseo is deliberately absent from disallowedTools, because Paseo lifecycle operation is the Supervisor's function. DIFFERENCES FROM THE CLAUDE SUPERVISOR: no role-gate.sh (a Claude Code hook) and no Paseo plan mode - Codex modes are auto, auto-review and full-access - so the no-write boundary of a no-write mandate rests on the role law, not on a mode. RUNS UNSANDBOXED (owner directive 2026-11-05): options sets sandbox_mode danger-full-access and approval_policy never; Paseo deep-merges provider options into every launch and explicit Codex sandbox/approval options override the mode presets, so the seat runs without a sandbox or approval prompts whatever mode it is created in. Measured the same day: under the auto preset every Paseo MCP call waited for a Human approval and the paseo CLI failed in the sandbox (uv_uptime EPERM), so a sandboxed Codex Supervisor cannot observe or operate. The thinking options match codex-peer's gpt-6-astra (medium default; ultra rejected by CLIProxyAPI). gpt-6-astra is off the Codex catalog; its entry is in the host's ~/.codex/model-catalog.1m.json. Fast mode stays off: do not pass featureValues.fast_mode to create_agent here.",
+        "command": [
+          "@HOME@/.local/bin/codex-room",
+          "supervisor"
+        ],
+        "env": {
+          "ROOM_ROLE": "supervisor"
+        },
+        "options": {
+          "sandbox_mode": "danger-full-access",
+          "approval_policy": "never"
+        },
+        "models": [
+          {
+            "id": "gpt-6-astra",
+            "label": "GPT-6 Astra",
+            "isDefault": true,
+            "thinkingOptions": [
+              {
+                "id": "medium",
+                "label": "Medium",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "high",
+                "label": "High"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          }
+        ],
+        "disallowedTools": [
+          "Task",
+          "Agent",
+          "Workflow"
+        ],
+        "order": 3
+      },
       "lead": {
         "extends": "claude",
         "label": "Lead-of-record",
-        "description": "Router and binding arbiter \u2014 planning, coordination, acceptance",
+        "description": "Router and binding arbiter — planning, coordination, acceptance",
         "command": [
           "@HOME@/.paseo/orchestration/bin/claude-lead"
         ],
@@ -77,12 +129,12 @@
         "models": [
           {
             "id": "claude-opus-5-5",
-            "label": "Opus 5.5 (1M)"
+            "label": "Opus 5.5 (1M)",
+            "isDefault": true
           },
           {
             "id": "claude-opus-5",
-            "label": "Opus 5 (1M)",
-            "isDefault": true
+            "label": "Opus 5 (1M)"
           },
           {
             "id": "claude-opus-4-8[1m]",
@@ -108,6 +160,10 @@
             "id": "claude-opus-5-5",
             "label": "Opus 5.5 (1M)",
             "isDefault": true
+          },
+          {
+            "id": "claude-sonnet-5-5",
+            "label": "Sonnet 5.5 (1M)"
           },
           {
             "id": "claude-fable-5-1",
@@ -140,7 +196,7 @@
       "codex-peer": {
         "extends": "codex",
         "label": "Codex Peer",
-        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools. Six models: deepseek-v4.1-flash (the default), gpt-6-sol, gpt-6.1-sol, gpt-6-astra, gpt-5.6-sol and gpt-5.6-luna. Which role a model plays is set per workspace by that workspace's WORKSPACE_PROTOCOL.md, not here. deepseek-v4.1-flash is the declared default in BOTH this table and ~/.codex/peer.config.toml, so the model a seat resolves to and the model its record names are the same value; keep those two in step. NO OCR COVERAGE LANE (owner directive 2026-09-14): the OCR block was removed from ~/.codex/peer.config.toml and ~/.opencodereview is no longer a writable root, so a gpt-5.6-luna seat is an ordinary Peer; its thinkingOptions still offer only max. PEER DEFAULTS (owner directive 2026-09-14, from the reference Peer config): effort medium, sandbox danger-full-access, approval never. deepseek-v4.1-flash offers two thinking options, high (the default) and none, and CLIProxyAPI clamps medium to high for it; gpt-5.6-sol offers medium (the default, matching the overlay), low, high, xhigh and max; ultra is left out because it delegates tasks automatically. gpt-6-sol (added 2026-09-29) offers the same five levels; CLIProxyAPI rejects ultra for it outright. It is off the Codex catalog, so its entry lives in ~/.codex/model-catalog.1m.json and ~/.codex/peer.catalog-extra.json (cloned from gpt-5.6-sol). gpt-6.1-sol and gpt-6-astra (added on the Mac 2026-11-03, owner request) offer the same five levels; the Mac CLIProxyAPI (Codex account anbinh250202) serves both and was probed that day: low/medium/high/xhigh/max accepted, ultra rejected. Both are off the Codex catalog too, with entries in the same two files cloned from gpt-6-sol. FAST MODE STAYS OFF (owner directive 2026-09-12): Codex fast_mode is 'Priority inference at 2x usage' and was found ON for gpt-5.6-sol on three live seats. It defaults to off, so each was turned on deliberately at spawn - do not pass featureValues.fast_mode to create_agent here.",
+        "description": "Bounded engineering collaborator on CLIProxy-routed models; no Paseo tools. Six models: deepseek-v4.1-flash (the default), gpt-6-sol, gpt-6.1-sol, gpt-6-astra, gpt-5.6-sol and gpt-5.6-luna. The list is the same on every host; which of them a host can serve depends on the accounts behind its CLIProxyAPI (README, Host notes), and a model the host does not serve fails at seat launch. Which role a model plays is set per workspace by that workspace's WORKSPACE_PROTOCOL.md, not here. deepseek-v4.1-flash is the declared default in BOTH this table and codex/peer.config.toml, so the model a seat resolves to and the model its record names are the same value; keep those two in step. NO OCR COVERAGE LANE (owner directive 2026-09-14): the OCR block was removed from the peer overlay and ~/.opencodereview is no longer a writable root, so a gpt-5.6-luna seat is an ordinary Peer; its thinkingOptions still offer only max. PEER DEFAULTS (owner directive 2026-09-14, from the reference Peer config): effort medium, sandbox danger-full-access, approval never. deepseek-v4.1-flash (Mistral deepseek-v4-1-flash-1017) offers high (the default), none, low, xhigh and max, the efforts Mistral accepts (2026-11-11); Mistral rejects minimal and medium, so CLIProxyAPI clamps the overlay's medium to a declared level. gpt-5.6-sol offers medium (the default, matching the overlay), low, high, xhigh and max; ultra is left out because it delegates tasks automatically. gpt-6-sol, gpt-6.1-sol and gpt-6-astra offer the same five levels; CLIProxyAPI rejects ultra for them outright. All three are off the Codex catalog, so their entries live in codex/peer.catalog-extra.json and the host's ~/.codex/model-catalog.1m.json. gpt-6.1-sol is the image lane where the host's [model_providers.cliproxy] carries an x-openai-actor-authorization header: Codex exposes its built-in image_gen tool only then (codex-rs image_generation_available), and codex-room-sync carries that table into the peer runtime. FAST MODE STAYS OFF (owner directive 2026-09-12): Codex fast_mode is 'Priority inference at 2x usage' and was found ON for gpt-5.6-sol on three live seats. It defaults to off, so each was turned on deliberately at spawn - do not pass featureValues.fast_mode to create_agent here.",
         "command": [
           "@HOME@/.local/bin/codex-room",
           "peer"
@@ -159,6 +215,18 @@
               {
                 "id": "none",
                 "label": "None"
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
               }
             ]
           },
@@ -297,7 +365,7 @@
           "@HOME@/.local/bin/agy-acp"
         ],
         "env": {
-          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
           "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
           "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
         },
@@ -321,7 +389,7 @@
           "@HOME@/.local/bin/agy-acp"
         ],
         "env": {
-          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
           "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
           "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
         },
@@ -345,7 +413,7 @@
           "@HOME@/.local/bin/agy-acp"
         ],
         "env": {
-          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
           "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
           "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
         },
@@ -381,6 +449,18 @@
               {
                 "id": "none",
                 "label": "None"
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
               }
             ]
           },
@@ -470,12 +550,12 @@
       "watcher": {
         "extends": "acp",
         "label": "Watcher",
-        "description": "Read-only Watcher on Gemini, started and fed only by the Supervisor (roles/supervisor.md, Watcher section). Built on the agy-acp ACP bridge like gemini-peer, so roles/*.md cannot be injected by Paseo; instead AGY_EXTRA_ARGS adds @HOME@/.paseo/watcher to every agy run, and agy loads that directory's AGENTS.md (-> roles/watcher.md) as rules and its .agents/hooks.json as a PreToolUse gate (watcher/watcher-gate.sh). The gate, not the prompt, is the boundary: every tool is denied except run_command of paseo ls|logs|inspect, so the seat cannot read or write files, run other commands, or message seats. --dangerously-skip-permissions is required because a hook allow does not grant headless permission; the hook deny still wins (verified 2026-09-30). The directory must stay outside any git repository: agy walks from it to the repo root and would load that repo's AGENTS.md too (verified with the room checkout). No Paseo MCP (supportsMcpServers=false). Runs on both hosts (duckling-oci since 2026-09-30).",
+        "description": "Read-only Watcher on Gemini, started and fed only by the Supervisor (roles/supervisor.md, Watcher section). Built on the agy-acp ACP bridge like gemini-peer, so roles/*.md cannot be injected by Paseo; instead AGY_EXTRA_ARGS adds @HOME@/.paseo/watcher to every agy run, and agy loads that directory's AGENTS.md (-> roles/watcher.md) as rules and its .agents/hooks.json as a PreToolUse gate (watcher/watcher-gate.sh). The gate, not the prompt, is the boundary: every tool is denied except run_command of paseo ls|logs|inspect, so the seat cannot read or write files, run other commands, or message seats. --dangerously-skip-permissions is required because a hook allow does not grant headless permission; the hook deny still wins (verified 2026-09-30). The directory must stay outside any git repository: agy walks from it to the repo root and would load that repo's AGENTS.md too (verified with the room checkout). No Paseo MCP (supportsMcpServers=false).",
         "command": [
           "@HOME@/.local/bin/agy-acp"
         ],
         "env": {
-          "PATH": "@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
           "AGY_MODELS": "gemini-3.8-flash",
           "AGY_EXTRA_ARGS": "--dangerously-skip-permissions --add-dir @HOME@/.paseo/watcher"
         },
@@ -490,6 +570,112 @@
           }
         },
         "order": 23
+      },
+      "glm": {
+        "extends": "claude",
+        "label": "GLM (Z.ai)",
+        "description": "GLM models via Z.ai Anthropic-compatible endpoint; key in ~/.paseo/glm.key",
+        "command": [
+          "@HOME@/.paseo/orchestration/bin/claude-glm"
+        ],
+        "models": [
+          {
+            "id": "glm-5.3",
+            "label": "GLM-5.3",
+            "isDefault": true
+          },
+          {
+            "id": "glm-5.3-flash",
+            "label": "GLM-5.3-Flash (Vision)"
+          }
+        ],
+        "disallowedTools": [
+          "Task",
+          "Agent",
+          "Workflow",
+          "mcp__paseo"
+        ],
+        "order": 40
+      },
+      "glm-researcher": {
+        "extends": "pi",
+        "label": "Researcher",
+        "description": "Feynman research agent (github.com/Companion-Inc/feynman) run by Pi, on GLM through the Z.ai Coding Plan or on DeepSeek V4.1 Flash through the local CLIProxyAPI (Mistral upstream, deepseek-v4-1-flash-1017). Labelled \"Researcher\" since 2026-11-11 (owner request); the provider id stays glm-researcher so existing agents keep resolving. bin/pi-feynman starts pi with Feynman's system prompt, ZAI_API_KEY from ~/.paseo/glm.key and CLIPROXY_API_KEY (daemon environment, else the proxy config); the cliproxy provider is declared host-locally in ~/.pi/agent/models.json with store and the developer role turned off, both of which Mistral rejects (422). Feynman 0.5.36 and its core Pi packages (pi-subagents, pi-web-access, pi-docparser, pi-btw) are installed in ~/.pi/agent with `pi install`, and ~/.pi/agent/settings.json carries the subagent wiring the feynman launcher would write. Use /deepresearch, /lit, /review, /compare, /summarize; artifacts land in outputs/ and papers/ under the agent's cwd (~/research is set up for this). /deepresearch writes a plan and waits for a \"yes\" before it searches. Peer-shaped with no Paseo tools: Paseo hands its MCP to a Pi seat only when the pi-mcp-adapter extension is installed (PiRpcAgentClient.prepareMcpConfig), and disallowedTools is not read by the Pi client, so the barrier is that adapter's absence; smoke checks it. Pi has no permission modes. GLM-5.3 accepts thinking low, high and max only; DeepSeek V4.1 Flash on Mistral accepts off (sent as none), low, high, xhigh and max.",
+        "command": [
+          "@HOME@/.paseo/orchestration/bin/pi-feynman"
+        ],
+        "env": {
+          "PATH": "@HOME@/.npm-global/bin:@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        },
+        "models": [
+          {
+            "id": "zai/glm-5.3",
+            "label": "GLM-5.3",
+            "isDefault": true,
+            "thinkingOptions": [
+              {
+                "id": "high",
+                "label": "High",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "zai/glm-5.3-flash",
+            "label": "GLM-5.3-Flash (Vision)",
+            "thinkingOptions": [
+              {
+                "id": "high",
+                "label": "High",
+                "isDefault": true
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          },
+          {
+            "id": "cliproxy/deepseek-v4.1-flash",
+            "label": "DeepSeek V4.1 Flash",
+            "thinkingOptions": [
+              {
+                "id": "high",
+                "label": "High",
+                "isDefault": true
+              },
+              {
+                "id": "off",
+                "label": "None"
+              },
+              {
+                "id": "low",
+                "label": "Low"
+              },
+              {
+                "id": "xhigh",
+                "label": "Extra High"
+              },
+              {
+                "id": "max",
+                "label": "Max"
+              }
+            ]
+          }
+        ],
+        "order": 41
       }
     }
   }

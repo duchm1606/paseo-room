@@ -10,10 +10,10 @@ immediately. There is no build step between you and production.
   `~/.codex/<role>.config.toml`) are owner-approved text. Restructure around
   them freely; do not reword them without an explicit owner request.
 - Tools still read their own homes, but what the room manages there is
-  sourced from this repo and installed by `bin/room-install <host>`:
-  the Paseo provider table (`hosts/<host>.json`), seat settings
+  sourced from this repo and installed by `bin/room-install`:
+  the Paseo provider table (`room.json`, one for every host), seat settings
   (`claude/seat-settings.json`), the seat skill set (`skills/`), and the
-  codex-room scripts plus the peer overlay (`codex/`). Edit the repo copy,
+  codex-room scripts plus the peer and supervisor overlays (`codex/`). Edit the repo copy,
   never the installed one. Everything else in a tool home (the Codex base
   `~/.codex/config.toml`, unmanaged overlays, the operator's own
   `~/.claude/skills`) stays host-local.
@@ -25,8 +25,8 @@ immediately. There is no build step between you and production.
   seeded symlinks are managed, by `bin/claude-profile`).
 - `~/.paseo/config.json` is daemon-owned except `daemon.mcp`, `pluginsEnabled`,
   `plugins` and `agents.providers`, which room-install renders from
-  `hosts/<host>.json` (`@HOME@` becomes the host's home). Change the host
-  file, run `bin/room-install`, then restart the daemon when no seat is
+  `room.json` (`@HOME@` becomes the host's home). There is no per-host
+  variant: change `room.json`, run `bin/room-install`, then restart the daemon when no seat is
   mid-task. `tests/smoke.sh` fails on drift between the two.
 - `telemetry/*.jsonl` and `attic/` accrue during operation and are
   gitignored; `SUPERVISOR_NOTEBOOK.md` is versioned — append deliberately,

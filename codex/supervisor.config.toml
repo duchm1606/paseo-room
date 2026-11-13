@@ -1,0 +1,41 @@
+# Codex Supervisor — Paseo provider "codex-supervisor" (CLIProxyAPI transport).
+# Owner request 2026-11-05: a Supervisor seat on Codex, model gpt-6-astra.
+#
+# This replaces the live-only ~/.codex/supervisor.config.toml left behind when
+# the old "codex-supervisor (watcher)" provider was dropped on 2026-09-09
+# (a2757ec): DeepSeek, read-only, and a short inline prompt that predates the
+# current role law. room-install now links this file in its place and keeps
+# the old one as a .bak-room-* backup.
+#
+# The Supervisor law is roles/supervisor.md, shared with the Claude supervisor
+# seat so the two cannot drift; codex-room-sync reads it into
+# developer_instructions.
+#
+# The Claude seat keeps a no-write mandate in Paseo's plan mode. Codex has no
+# plan mode in Paseo (modes: auto, auto-review, full-access), so on this seat
+# the no-write boundary rests on the role law, not on a mode.
+#
+# UNSANDBOXED (owner directive 2026-11-05): no sandbox, no approval prompts.
+# The binding setting is `options` on codex-supervisor in room.json:
+# Paseo merges it into every launch and explicit Codex sandbox/approval
+# options override the mode presets, so this holds whatever mode the seat is
+# created in. The two values below say the same for a launch that carries no
+# options. Measured the same day under the "auto" preset: every Paseo MCP call
+# waited for a Human approval and the paseo CLI failed in the sandbox
+# (uv_uptime EPERM), so a sandboxed Supervisor cannot observe or operate.
+#
+# Window and compaction mirror codex-peer: gpt-6-astra carries a 1048576
+# catalog window, and compacting at 300k (owner directive 2026-09-12 for
+# Codex seats) bounds what a long-lived Supervisor session re-sends each turn.
+
+model_context_window = 1048576
+model_auto_compact_token_limit = 307200
+
+# Keep equal to the `isDefault` model under codex-supervisor in room.json.
+model = "gpt-6-astra"
+model_reasoning_effort = "medium"
+model_reasoning_summary = "none"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+
+room_instructions_file = "~/.paseo/orchestration/roles/supervisor.md"
