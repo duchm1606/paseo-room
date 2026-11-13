@@ -50,6 +50,12 @@ OVERRIDE_KEYS = {
 OPTIONAL_LINKS = {"auth.json", "AGENTS.md", "hooks.json", "skills", "plugins",
                   "model-instructions.md"}
 
+# Room skills a role's Codex seat carries besides the operator's own. This is
+# the Codex side of the per-role skill matrix in hooks/role-gate.sh, which
+# only gates Claude seats: a Codex seat sees exactly what is linked into its
+# runtime, so a role absent here sees no room skill at all.
+ROOM_SKILLS = {"supervisor": ("grilling",)}
+
 
 def atomic_write(path: pathlib.Path, content: str) -> None:
     fd, temporary = tempfile.mkstemp(prefix=f"{path.name}.", dir=path.parent)
@@ -60,6 +66,40 @@ def atomic_write(path: pathlib.Path, content: str) -> None:
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def link_role_skills(runtime: pathlib.Path, shared: pathlib.Path, names: tuple) -> None:
+    """Give one role a skills directory of its own: every operator skill
+    under ~/.codex/skills plus the named room skills, each as a symlink."""
+    room = pathlib.Path(__file__).resolve().parents[2] / "skills"
+    target = runtime / "skills"
+    if target.is_symlink():
+        target.unlink()
+    target.mkdir(exist_ok=True)
+    wanted = {entry.name: entry for entry in shared.iterdir()} if shared.is_dir() else {}
+    for name in names:
+        source = room / name
+        if (source / "SKILL.md").is_file():
+            wanted[name] = source
+        else:
+            print(f"room skill not found, skipped: {source}", file=sys.stderr)
+    for child in target.iterdir():
+        if child.is_symlink() and child.name not in wanted:
+            child.unlink()
+    for name, source in wanted.items():
+        safe_link(target, name, source)
+
+
+def unlink_role_skills(runtime: pathlib.Path) -> None:
+    """Undo link_role_skills for a role that no longer carries room skills,
+    so the plain ~/.codex/skills link can take the name again."""
+    target = runtime / "skills"
+    if target.is_dir() and not target.is_symlink():
+        children = list(target.iterdir())
+        if all(child.is_symlink() for child in children):
+            for child in children:
+                child.unlink()
+            target.rmdir()
 
 
 def top_level_table_offset(text: str) -> int:
@@ -251,6 +291,12 @@ def main() -> None:
             stale = runtime / name
             if stale.is_symlink():
                 stale.unlink()
+    room_skills = ROOM_SKILLS.get(role, ()) if link_default_skills else ()
+    if room_skills:
+        links.remove("skills")
+        link_role_skills(runtime, codex_home / "skills", room_skills)
+    else:
+        unlink_role_skills(runtime)
     for name in links:
         safe_link(runtime, name, codex_home / name)
 

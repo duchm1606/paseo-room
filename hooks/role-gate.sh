@@ -96,7 +96,7 @@ SUPERVISOR_ALLOW=" visual-explainer writing-great-skills teach goal-distill
  triage schedule loop update-config keybindings-help
  fewer-permission-prompts init claude-api
  paseo-supervisor architecture-premise-audit
- test-proof-debt-audit "
+ test-proof-debt-audit grilling "
 
 allow=""
 case "$profile" in
