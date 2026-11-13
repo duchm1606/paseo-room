@@ -357,6 +357,30 @@
           "mcp__paseo"
         ]
       },
+      "gemini": {
+        "extends": "acp",
+        "label": "Gemini",
+        "description": "Base Gemini seat (owner request 2026-11-13), launched exactly like gemini-supervisor: agy-acp with the same PATH, AGY_MODELS roster and --dangerously-skip-permissions, and the Paseo MCP on (supportsMcpServers=true), like the claude and codex base seats. Models come live from `agy models`, filtered by AGY_MODELS. As on every agy-acp seat: no role law (an ACP seat takes no system prompt), no permission modes, and disallowedTools would be dropped by Paseo's acp branch, so the claude base seat's no-subagent line is not enforced here. Host prerequisites are in README, Gemini seats (agy).",
+        "command": [
+          "@HOME@/.local/bin/agy-acp"
+        ],
+        "env": {
+          "PATH": "@HOME@/.local/bin:@HOME@/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+          "AGY_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash",
+          "AGY_EXTRA_ARGS": "--dangerously-skip-permissions"
+        },
+        "params": {
+          "supportsMcpServers": true,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            },
+            "terminal": true
+          }
+        },
+        "order": 19
+      },
       "gemini-peer": {
         "extends": "acp",
         "label": "Gemini Peer",

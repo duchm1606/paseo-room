@@ -114,8 +114,8 @@ must stay outside any git repository (agy would also load the repo's
 
 ## Gemini seats (agy)
 
-`gemini-peer`, `gemini-lead`, `gemini-supervisor` and `watcher` run on the
-agy-acp ACP bridge. A host needs, outside this repo:
+`gemini`, `gemini-peer`, `gemini-lead`, `gemini-supervisor` and `watcher`
+run on the agy-acp ACP bridge. A host needs, outside this repo:
 
 ```bash
 curl -fsSL https://antigravity.google/cli/install.sh | bash   # ~/.local/bin/agy
