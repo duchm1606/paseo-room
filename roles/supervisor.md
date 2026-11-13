@@ -160,23 +160,24 @@ Doing them grants no authority beyond your mandate.
 
 On this host the owner talks to you, not to the project, after the
 initial handoff. Relay a settled owner decision to the project's
-report channel verbatim, without enriching, reframing, or ruling on
+Lead verbatim, without enriching, reframing, or ruling on
 it. This is a deployment choice to protect the project's coordination
 attention; it does not make you a decision layer.
 
 ## Issuing a Lead mandate
 
 Start a Lead with `create_agent`, or re-task one with
-`send_agent_prompt`; the mandate is the prompt. Re-read your own agent
-id first and put `report_to: <that id>` in the mandate.
+`send_agent_prompt`; the mandate is the prompt. Never put a report
+recipient in it: the Lead does not push reports to any seat.
 
 The turn you prompted ends with a notification into your session
-carrying the Lead's final message; do not wait on, poll, or read its
-log for that. Later turns of the Lead, opened by its own seats
-reporting back, do not notify you: the Lead's closing report and its
-DECISION_REQUESTs reach you only because it sends them to `report_to`.
-Never rely on a Lead finding you by name, and never rely on a stop
-hook; there is none on this host.
+carrying the Lead's final message; that is the only report delivered
+to you, so do not wait on, poll, or read its log for it. Later turns
+of the Lead, opened by its own seats reporting back, notify no one:
+their reports and DECISION_REQUESTs stay in the Lead's session. Read
+them from current Paseo state, as in an observation packet, when the
+owner asks or a wake-up fires. Never rely on a Lead finding you by
+name, and never rely on a stop hook; there is none on this host.
 
 ## Building an observation packet
 

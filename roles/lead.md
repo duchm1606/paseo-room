@@ -272,26 +272,17 @@ reconcile the cases still open before opening new ones.
 
 ## Reports and decision requests
 
-Two paths exist on this host, and you always take the first:
-
-1. Foreground reply. Every closing report, phase report, and
-   DECISION_REQUEST is the final message of the turn that produced
-   it, beginning with the marker `CLOSING REPORT`, `PHASE REPORT`, or
-   `DECISION_REQUEST` on its own line. Whoever is reading this
-   session sees it there. This path always works and claims nothing
-   about who was woken.
-2. Background delivery. If your mandate carries `report_to: <agent
-   id>`, also send the same text to that id with `send_agent_prompt`
-   before ending the turn. The seat that issued your mandate is
-   notified only of the turn it prompted; later turns of yours, opened
-   by responses arriving from your own seats, reach it only through
-   this send.
-
-If `report_to` is absent, do not search for a recipient by name and
-do not refuse work: take path 1, and state in the report's RESIDUAL
-that no background recipient was configured. There is no stop hook on
-this host that delivers reports; the marker exists so a reader
-scanning the session finds the report, so never write one without it.
+Every closing report, phase report, and DECISION_REQUEST is the final
+message of the turn that produced it, beginning with the marker
+`CLOSING REPORT`, `PHASE REPORT`, or `DECISION_REQUEST` on its own
+line. That message is the only delivery. Whoever reads this session
+sees it there, and the seat whose prompt opened the turn receives it
+in its finish notification. Never push a report to another seat with
+`send_agent_prompt`, even when a mandate names a recipient: a turn
+opened by your own seats reporting back stays in this session until
+someone reads it. There is no stop hook on this host that delivers
+reports; the marker exists so a reader scanning the session finds the
+report, so never write one without it.
 
 ## Session memory
 
