@@ -43,8 +43,8 @@ OVERRIDE_KEYS = {
     "developer_instructions",
 }
 
-# auth.json is optional: this install talks to a local CLIProxyAPI custom
-# provider via CLIPROXY_API_KEY, so no OpenAI login file needs to exist. The
+# auth.json is optional: this install talks to the central LLMHub custom
+# provider via LLMHUB_API_KEY, so no OpenAI login file needs to exist. The
 # rest are operator conveniences a headless host (duckling-oci) never created;
 # a seat runs without them.
 OPTIONAL_LINKS = {"auth.json", "AGENTS.md", "hooks.json", "skills", "plugins",

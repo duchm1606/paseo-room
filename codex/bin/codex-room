@@ -11,21 +11,21 @@ esac
 "${HOME}/.local/bin/codex-room-sync" "$role"
 export CODEX_HOME="${HOME}/.codex-runtime/${role}"
 
-# Codex reaches models through the local CLIProxyAPI custom provider. The key
-# is read from the proxy config rather than copied here, so rotating it there
-# is enough; an exported CLIPROXY_API_KEY wins (duckling-oci sets it in the
-# daemon's systemd EnvironmentFile). Homebrew config on macOS, the upstream
-# default location on Linux.
-if [ -z "${CLIPROXY_API_KEY:-}" ]; then
-  CLIPROXY_API_KEY="$(sed -n '/^api-keys:/,/^[A-Za-z#]/p' \
-    /opt/homebrew/etc/cliproxyapi.conf "$HOME/.cli-proxy-api/config.yaml" 2>/dev/null |
-    grep -oE '[A-Za-z0-9]{32,}' | head -1)"
-  if [ -z "$CLIPROXY_API_KEY" ]; then
-    printf 'codex-room: cannot read an api-key from cliproxyapi.conf; refusing to start %s without a CLIProxyAPI credential\n' "$role" >&2
+# Codex reaches models through the central LLMHub instance, a shared
+# CLIProxyAPI at https://llmhub.theduckling.tech. The key lives in
+# ~/.paseo/llmhub.key (mode 600) so it is never committed; an exported
+# LLMHUB_API_KEY wins, which is how a host can inject it from its daemon
+# environment instead. No local proxy is needed or consulted.
+if [ -z "${LLMHUB_API_KEY:-}" ]; then
+  if [ -s "$HOME/.paseo/llmhub.key" ]; then
+    LLMHUB_API_KEY="$(tr -d '[:space:]' < "$HOME/.paseo/llmhub.key")"
+  fi
+  if [ -z "$LLMHUB_API_KEY" ]; then
+    printf 'codex-room: no LLMHub credential in ~/.paseo/llmhub.key; refusing to start %s\n' "$role" >&2
     exit 3
   fi
 fi
-export CLIPROXY_API_KEY
+export LLMHUB_API_KEY
 
 # HISTORY. peer-zen and the now-deleted `review` role both talked straight to
 # OpenCode Zen because CLIProxyAPI 7.2.120 dropped the SSE terminator events

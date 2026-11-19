@@ -17,11 +17,12 @@
 > dual-review seat. All three lanes hand findings to Lead, who alone
 > issues the verdict.
 >
-> The lane is routed as `codex-peer/gpt-5.6-luna`. It was a dedicated
-> `codex-review` provider until 2026-09-12, when the owner deleted it
-> and the specialization moved into the peer overlay gated on that
-> model. The topology did not change; only where the lane is staffed
-> from did.
+> The lane is staffed from `codex-peer` against whatever model the
+> live provider table serves; LLMHub currently serves only
+> `deepseek-v4-1-flash-1017`. It was a dedicated `codex-review` provider
+> until 2026-09-12, when the owner deleted it and the specialization
+> moved into the peer overlay. The topology did not change; only
+> where the lane is staffed from did.
 
 > Read by the Lead when convening a council (TARGET law 6 defines when
 > one is warranted). Source: Demonthorn thread analysis, 2026-08-05.

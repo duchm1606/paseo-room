@@ -27,6 +27,20 @@ for f in "$ROOM/room.json" "$ROOM/claude/seat-settings.json"; do
   jq -e . "$f" >/dev/null || die "$f is not valid JSON"
 done
 
+# 2b. The LLMHub credential the Codex launchers read. No network call here:
+#     this only checks that a key exists where codex-room and pi-feynman look,
+#     which is the failure that otherwise surfaces as a seat dying at launch.
+if [ -n "$(jq -r --arg c "$CODEX_ROOM" \
+  '.agents.providers[] | select(.command[0]? == $c) | .command[1]' \
+  "$HOME/.paseo/config.json")" ]; then
+  if [ -z "${LLMHUB_API_KEY:-}" ]; then
+    [ -s "$HOME/.paseo/llmhub.key" ] \
+      || die "no LLMHub credential: set ~/.paseo/llmhub.key (mode 600) or LLMHUB_API_KEY"
+    m="$(mode "$HOME/.paseo/llmhub.key")"
+    [ "$m" = "600" ] || die "$HOME/.paseo/llmhub.key is mode $m, expected 600"
+  fi
+fi
+
 # 3. Provider commands: claude seats launch from the room checkout; the seats
 #    built on another tool launch from ~/.local/bin, where that tool's own
 #    config lives — codex-room for Codex, agy-acp for the Gemini ACP bridge.

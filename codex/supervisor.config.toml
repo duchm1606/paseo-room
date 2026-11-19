@@ -1,5 +1,7 @@
-# Codex Supervisor — Paseo provider "codex-supervisor" (CLIProxyAPI transport).
-# Owner request 2026-11-05: a Supervisor seat on Codex, model gpt-6-astra.
+# Codex Supervisor — Paseo provider "codex-supervisor" (central LLMHub transport).
+# Owner request 2026-11-14: the seat moved from gpt-6-astra to the one model
+# LLMHub serves, deepseek-v4.1-flash. The hub rewrites Codex's developer role
+# to system for Mistral and maps medium to high.
 #
 # This replaces the live-only ~/.codex/supervisor.config.toml left behind when
 # the old "codex-supervisor (watcher)" provider was dropped on 2026-09-09
@@ -24,15 +26,16 @@
 # waited for a Human approval and the paseo CLI failed in the sandbox
 # (uv_uptime EPERM), so a sandboxed Supervisor cannot observe or operate.
 #
-# Window and compaction mirror codex-peer: gpt-6-astra carries a 1048576
-# catalog window, and compacting at 300k (owner directive 2026-09-12 for
-# Codex seats) bounds what a long-lived Supervisor session re-sends each turn.
+# Window and compaction mirror codex-peer: deepseek-v4.1-flash carries a
+# 1048576 catalog window, and compacting at 300k (owner directive 2026-09-12
+# for Codex seats) bounds what a long-lived Supervisor session re-sends each
+# turn.
 
 model_context_window = 1048576
 model_auto_compact_token_limit = 307200
 
 # Keep equal to the `isDefault` model under codex-supervisor in room.json.
-model = "gpt-6-astra"
+model = "deepseek-v4-1-flash-1017"
 model_reasoning_effort = "medium"
 model_reasoning_summary = "none"
 sandbox_mode = "danger-full-access"

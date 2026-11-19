@@ -18,8 +18,8 @@ immediately. There is no build step between you and production.
   `~/.codex/config.toml`, unmanaged overlays, the operator's own
   `~/.claude/skills`) stays host-local.
 - No secret is ever committed. Seat tokens live only in each seat's
-  `settings.json` (mode 600); the CLIProxy key is read at launch from the
-  proxy config or `CLIPROXY_API_KEY`.
+  `settings.json` (mode 600); the LLMHub key is read at launch from
+  `~/.paseo/llmhub.key` or `LLMHUB_API_KEY`.
 - Never edit generated state: `~/.codex-runtime/<role>/` is rebuilt on every
   launch; `~/.claude/profiles/claude-<role>/` is seat-live state (only its
   seeded symlinks are managed, by `bin/claude-profile`).

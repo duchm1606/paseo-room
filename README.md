@@ -63,8 +63,10 @@ git clone https://github.com/duchm1606/paseo-room.git ~/.paseo/orchestration
 ~/.paseo/orchestration/bin/room-install
 ```
 
-Prerequisites: `jq`, `claude`, `codex`, `python3` and a running CLIProxyAPI whose key is in
-`CLIPROXY_API_KEY` or the proxy config. The daemon must have started once so
+Prerequisites: `jq`, `claude`, `codex`, `python3` and an LLMHub key in
+`~/.paseo/llmhub.key` (mode 600) or `LLMHUB_API_KEY`. Every host talks to the
+same central CLIProxyAPI at `https://llmhub.theduckling.tech`; no local proxy
+is needed. The daemon must have started once so
 `~/.paseo/config.json` exists. A seat without a token is seeded from the seat
 template, else from the operator's `~/.claude/settings.json`; otherwise mint
 one with `claude setup-token` and set it with `claude-seat-token`.
@@ -124,6 +126,11 @@ cargo build --release && install -m 755 target/release/agy-acp ~/.local/bin/
 # Google sign-in: run `agy` once interactively (SSH prints a login URL), or
 # copy ~/.gemini/antigravity-cli/antigravity-oauth-token (mode 600) from a
 # signed-in host.
+# Paseo MCP for the seats with supportsMcpServers=true (gemini, gemini-lead,
+# gemini-supervisor): agy reads MCP servers only from its global config, so
+# the bridge's proxy is registered there once (LOCAL-PATCHES.md, patch 3).
+# Without it those seats run but have no Paseo tools.
+agy mcp add paseo "$HOME/.local/bin/agy-acp" mcp-proxy
 ```
 
 ## Host notes
@@ -131,19 +138,20 @@ cargo build --release && install -m 755 target/release/agy-acp ~/.local/bin/
 `room.json` is the same everywhere. What differs between machines is what
 they have, and a seat a machine cannot serve fails at launch with the reason.
 
-- Mac: CLIProxyAPI from Homebrew (`/opt/homebrew/etc/cliproxyapi.conf`).
-  Its Codex account (anbinh250202) serves gpt-6.1-sol and gpt-6-astra
-  (probed 2026-11-03: low to max accepted, ultra rejected). No `pi`, no
+- Both hosts route Codex seats through the central LLMHub instance
+  (`https://llmhub.theduckling.tech`, CLIProxyAPI 8.x on duckling-eztech).
+  The hub serves one model, `deepseek-v4-1-flash-1017` (Mistral's native
+  name; the old `deepseek-v4.1-flash` alias is gone); its `/v1/models` is the authority, and a
+  model the hub does not serve fails at seat launch. The hub rewrites
+  Codex's `developer` role to `system` and maps `medium` to `high` for
+  Mistral, so the room can offer the full thinking ladder.
+- Mac: no local CLIProxyAPI is consulted any more. No `pi`, no
   `~/.paseo/glm.key`: `glm` and `glm-researcher` do not start here.
-- duckling-oci: CLIProxyAPI key in the daemon environment (systemd
-  EnvironmentFile `~/.config/cliproxy.env`). Its Codex OAuth account
-  (nguyenanhem91, moved from the Mac 2026-10-01) serves deepseek-v4.1-flash
-  and gpt-6.1-sol; the other `codex-peer` models and the `codex-supervisor`
-  model are listed but not served unless that account gains them. agy
-  1.2.14 linux_arm64 from the official installer, agy-acp built on the host
-  from `~/.local/src/agy-acp`, Google sign-in copied from the Mac token
-  file; the paseo CLI is in `~/.npm-global/bin`. `~/.paseo/glm.key` and
-  `~/.pi/agent/models.json` are here, so the GLM seats run here.
+- duckling-oci: `~/.paseo/glm.key` and `~/.pi/agent/models.json` are here,
+  so the GLM seats run here. agy 1.2.14 linux_arm64 from the official
+  installer, agy-acp built on the host from `~/.local/src/agy-acp`, Google
+  sign-in copied from the Mac token file; the paseo CLI is in
+  `~/.npm-global/bin`.
 
 ## Verify
 

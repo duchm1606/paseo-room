@@ -2,8 +2,8 @@
   "_provenance": "Read by codex-room-sync, never by Codex. The deepseek-v4.1-flash entry mirrors model_info_from_slug() in codex-rs/models-manager/src/model_info.rs at tag rust-v0.146.1 field for field; base_instructions is codex-rs/models-manager/prompt.md at that tag, verified byte-identical inside the installed codex-cli 0.146.1 binary on 2026-09-13. The sync overwrites the window fields with the overlay's model_context_window. Regenerate from source when codex is upgraded: a stale mirror silently diverges from what an unknown slug would have received. EXCEPTION, 2026-09-29: the gpt-6-sol entry is NOT a fallback mirror. It is the gpt-5.6-sol catalog entry cloned (same GPT family, same CLIProxyAPI route) with slug/display_name changed, ultra dropped (CLIProxyAPI rejects it for gpt-6-sol), fast speed/service tiers emptied (fast mode stays off), and multi_agent_version nulled. The same entry is appended to ~/.codex/model-catalog.1m.json, which is where `codex debug models` reads it from; that catalog copy wins over this one.",
   "models": [
     {
-      "slug": "deepseek-v4.1-flash",
-      "display_name": "deepseek-v4.1-flash",
+      "slug": "deepseek-v4-1-flash-1017",
+      "display_name": "deepseek-v4-1-flash-1017",
       "description": null,
       "supported_reasoning_levels": [
         {

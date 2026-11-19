@@ -61,11 +61,11 @@ an issue that was never read is `UNKNOWN`, not open or closed.
   delegation lane on the same frozen candidate; the OCR lane produces
   rule-based evidence and never replaces the macro
   (architectural/lifecycle) review lanes
-  - staff the OCR lane by MODEL, not by provider. On this host it is
-    `codex-peer/gpt-5.6-luna` at max effort; a dedicated
-    `codex-review` provider was deleted 2026-09-12. Instantiate this
+  - staff the OCR lane by MODEL, not by provider. Instantiate this
     field against the daemon's current provider table rather than
-    copying the route forward.
+    copying a route forward: LLMHub currently serves only
+    `codex-peer/deepseek-v4-1-flash-1017`, and a model it does not serve
+    fails at seat launch.
 - compare alternatives and reversal conditions
 - Lead issues one binding project verdict
 - Human decides irreversible product/cost trade-offs
